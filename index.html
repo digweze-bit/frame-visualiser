@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hourglass Frame Visualiser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root{
+    --navy:#16284A;
+    --navy-dark:#0E1B33;
+    --orange:#B5480C;
+    --orange-bright:#E05C2A;
+    --paper:#F6F3EC;
+    --paper-dim:#EAE5D8;
+    --line:#D8D0BE;
+    --ink:#1B1B18;
+    --ink-soft:#5B5952;
+    --white:#FFFFFF;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;}
+  h1,h2,h3,.display{font-family:'Fraunces',serif;font-weight:600;letter-spacing:-0.01em;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+
+  /* ---------- Layout shell ---------- */
+  #app{min-height:100vh;display:flex;flex-direction:column;}
+  header.topbar{
+    background:var(--navy);color:var(--paper);
+    padding:18px 28px;display:flex;align-items:center;justify-content:space-between;
+    border-bottom:3px solid var(--orange);
+  }
+  header.topbar .brand{display:flex;align-items:baseline;gap:10px;}
+  header.topbar .brand .mark{width:14px;height:14px;background:var(--orange-bright);display:inline-block;}
+  header.topbar h1{font-size:20px;margin:0;color:var(--paper);}
+  header.topbar .sub{font-size:12px;color:#9FB0CC;text-transform:uppercase;letter-spacing:.08em;}
+  header.topbar .user-row{display:flex;align-items:center;gap:14px;font-size:13px;color:#C7D2E5;}
+  header.topbar .user-row button{background:transparent;border:1px solid #3C517A;color:#C7D2E5;padding:6px 12px;font-size:12px;}
+  header.topbar .user-row button:hover{border-color:var(--orange-bright);color:#fff;}
+
+  nav.tabs{display:flex;background:var(--navy-dark);padding:0 28px;}
+  nav.tabs button{
+    background:transparent;border:none;color:#9FB0CC;padding:14px 18px;font-size:13px;
+    text-transform:uppercase;letter-spacing:.06em;border-bottom:3px solid transparent;
+  }
+  nav.tabs button.active{color:#fff;border-bottom-color:var(--orange-bright);}
+  nav.tabs button:hover{color:#fff;}
+
+  main{flex:1;padding:32px 28px 60px;max-width:1180px;width:100%;margin:0 auto;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* ---------- Auth ---------- */
+  #authView{max-width:380px;margin:80px auto;padding:36px;background:var(--white);border:1px solid var(--line);}
+  #authView h2{margin:0 0 4px;font-size:24px;}
+  #authView p.hint{color:var(--ink-soft);font-size:13px;margin:0 0 22px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin-bottom:5px;}
+  .field input, .field select, .field textarea{
+    width:100%;padding:9px 10px;border:1px solid var(--line);background:var(--paper);font-size:14px;color:var(--ink);
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{outline:2px solid var(--orange-bright);outline-offset:-1px;}
+  .btn{
+    display:inline-block;background:var(--navy);color:#fff;border:none;padding:10px 18px;font-size:13px;
+    text-transform:uppercase;letter-spacing:.05em;
+  }
+  .btn:hover{background:var(--orange);}
+  .btn.secondary{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+  .btn.secondary:hover{background:var(--navy);color:#fff;}
+  .btn.block{width:100%;text-align:center;}
+  .btn[disabled]{opacity:.5;cursor:not-allowed;}
+  .authToggle{margin-top:14px;font-size:12px;color:var(--ink-soft);text-align:center;}
+  .authToggle a{color:var(--orange);cursor:pointer;text-decoration:underline;}
+  .error{color:#A32020;font-size:12px;margin-top:8px;}
+
+  /* ---------- Section headers ---------- */
+  .sectionHead{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;border-bottom:2px solid var(--ink);padding-bottom:10px;}
+  .sectionHead h2{font-size:26px;margin:0;}
+  .sectionHead .count{font-size:12px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;}
+
+  /* ---------- Cards grid ---------- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px;margin-bottom:36px;}
+  .card{background:var(--white);border:1px solid var(--line);cursor:pointer;transition:border-color .15s;}
+  .card:hover{border-color:var(--orange);}
+  .card .thumb{width:100%;aspect-ratio:1;object-fit:cover;background:var(--paper-dim);display:block;}
+  .card .info{padding:10px 12px;}
+  .card .info .name{font-size:14px;font-weight:600;margin:0 0 2px;}
+  .card .info .meta{font-size:11px;color:var(--ink-soft);margin:0;}
+  .card.addCard{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;border:2px dashed var(--line);background:transparent;min-height:190px;color:var(--ink-soft);}
+  .card.addCard:hover{border-color:var(--orange);color:var(--orange);}
+  .card.addCard .plus{font-size:28px;line-height:1;}
+
+  /* ---------- Modal / form panel ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(14,27,51,.55);display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;z-index:50;}
+  .overlay.active{display:flex;}
+  .panel{background:var(--white);max-width:520px;width:100%;padding:28px;border:1px solid var(--line);}
+  .panel h3{margin:0 0 18px;font-size:20px;}
+  .panel .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .panel .closeRow{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+  .uploadBox{border:2px dashed var(--line);padding:18px;text-align:center;font-size:12px;color:var(--ink-soft);cursor:pointer;}
+  .uploadBox:hover{border-color:var(--orange);}
+  .uploadBox img{max-width:100%;max-height:140px;display:block;margin:0 auto 8px;}
+  .radioRow{display:flex;gap:16px;font-size:13px;}
+  .radioRow label{display:flex;align-items:center;gap:6px;}
+
+  /* ---------- Visualiser ---------- */
+  .visLayout{display:grid;grid-template-columns:280px 1fr;gap:28px;}
+  .artworkPicker{background:var(--white);border:1px solid var(--line);padding:16px;align-self:start;}
+  .artworkPicker h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 12px;color:var(--ink-soft);}
+  .artworkPicker select{width:100%;margin-bottom:14px;}
+  .awPreview img{width:100%;aspect-ratio:1;object-fit:cover;border:1px solid var(--line);}
+  .awPreview .specs{font-size:12px;color:var(--ink-soft);margin-top:8px;line-height:1.6;}
+  .awPreview .specs b{color:var(--ink);}
+
+  .frameChooser{margin-top:20px;}
+  .frameChooser h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px;color:var(--ink-soft);}
+  .frameChip{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);margin-bottom:6px;font-size:12px;background:var(--paper);}
+  .frameChip img{width:28px;height:28px;object-fit:cover;}
+  .frameChip .fname{flex:1;}
+  .frameChip button{background:transparent;border:none;color:var(--ink-soft);font-size:16px;line-height:1;}
+  .frameChip button:hover{color:#A32020;}
+  .addFrameBtn{width:100%;font-size:12px;padding:8px;}
+
+  .mountControls{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
+  .mountControls label{font-size:12px;display:flex;align-items:center;gap:8px;margin-bottom:8px;color:var(--ink-soft);}
+
+  .stage{background:var(--white);border:1px solid var(--line);padding:20px;min-height:520px;display:flex;flex-direction:column;}
+  .stageHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .stageHead h3{margin:0;font-size:16px;}
+  .stageHead .navBtns{display:flex;gap:8px;align-items:center;}
+  .stageHead .navBtns button{background:var(--navy);color:#fff;border:none;width:30px;height:30px;font-size:14px;}
+  .stageHead .navBtns button:hover{background:var(--orange);}
+  .stageHead .navBtns .idx{font-size:12px;color:var(--ink-soft);min-width:44px;text-align:center;}
+  .canvasWrap{flex:1;display:flex;align-items:center;justify-content:center;background:
+    repeating-conic-gradient(var(--paper-dim) 0% 25%, var(--paper) 0% 50%) 50% / 22px 22px;
+    border:1px solid var(--line);padding:20px;}
+  .canvasWrap canvas{max-width:100%;max-height:460px;box-shadow:0 18px 40px -12px rgba(14,27,51,.35);}
+  .frameCaption{text-align:center;font-size:12px;color:var(--ink-soft);margin-top:12px;}
+  .frameCaption b{color:var(--ink);}
+  .emptyStage{margin:auto;text-align:center;color:var(--ink-soft);font-size:13px;max-width:280px;}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;font-size:13px;z-index:100;display:none;}
+  .toast.active{display:block;}
+
+  @media (max-width:820px){
+    .visLayout{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= AUTH VIEW ================= -->
+  <div id="authView">
+    <h2>Hourglass Frame Visualiser</h2>
+    <p class="hint">Sign in with your Hourglass team account.</p>
+    <div class="field"><label>Email</label><input type="email" id="authEmail" autocomplete="username"></div>
+    <div class="field"><label>Password</label><input type="password" id="authPassword" autocomplete="current-password"></div>
+    <button class="btn block" id="authSubmitBtn">Sign in</button>
+    <div class="error" id="authError"></div>
+    <div class="authToggle" id="authToggleRow">New team member? <a id="authToggleLink">Create an account</a></div>
+  </div>
+
+  <!-- ================= MAIN APP ================= -->
+  <header class="topbar" id="topbar" style="display:none;">
+    <div class="brand">
+      <span class="mark"></span>
+      <div>
+        <h1>Hourglass Frame Visualiser</h1>
+        <div class="sub">Frame preview studio</div>
+      </div>
+    </div>
+    <div class="user-row">
+      <span id="userEmail"></span>
+      <button id="signOutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" style="display:none;">
+    <button data-view="visualise" class="active">Visualise</button>
+    <button data-view="artworks">Artworks</button>
+    <button data-view="frames">Frames</button>
+  </nav>
+
+  <main id="mainArea" style="display:none;">
+
+    <!-- ---- VISUALISE ---- -->
+    <section class="view active" id="view-visualise">
+      <div class="sectionHead">
+        <h2>Visualise</h2>
+        <span class="count">Pick an artwork, load frame options, compare as a carousel</span>
+      </div>
+      <div class="visLayout">
+        <aside class="artworkPicker">
+          <h3>Artwork</h3>
+          <select id="artworkSelect"><option value="">Select artwork&hellip;</option></select>
+          <div class="awPreview" id="awPreview" style="display:none;">
+            <img id="awPreviewImg" alt="">
+            <div class="specs" id="awPreviewSpecs"></div>
+          </div>
+
+          <div class="frameChooser" id="frameChooser" style="display:none;">
+            <h3>Frame options in this carousel</h3>
+            <div id="frameChipList"></div>
+            <select id="addFrameSelect" class="addFrameBtn" style="margin-bottom:6px;"><option value="">Add a frame&hellip;</option></select>
+
+            <div class="mountControls" id="mountControls">
+              <label><input type="checkbox" id="mountToggle"> Show mount board</label>
+              <div class="field" id="mountWidthField" style="display:none;">
+                <label>Mount width (mm)</label>
+                <input type="number" id="mountWidthInput" value="70" min="0" step="5">
+              </div>
+              <div class="field" id="mountColorField" style="display:none;">
+                <label>Mount colour</label>
+                <input type="color" id="mountColorInput" value="#F5F1E8">
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="stage">
+          <div class="stageHead">
+            <h3 id="stageFrameName">&nbsp;</h3>
+            <div class="navBtns" id="carouselNav" style="display:none;">
+              <button id="prevFrameBtn">&#8592;</button>
+              <span class="idx" id="carouselIdx">1 / 1</span>
+              <button id="nextFrameBtn">&#8594;</button>
+            </div>
+          </div>
+          <div class="canvasWrap" id="canvasWrap">
+            <div class="emptyStage" id="emptyStage">Select an artwork, then add one or more frame options to preview them here.</div>
+            <canvas id="previewCanvas" style="display:none;"></canvas>
+          </div>
+          <div class="frameCaption" id="frameCaption"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---- ARTWORKS ---- -->
+    <section class="view" id="view-artworks">
+      <div class="sectionHead">
+        <h2>Artworks</h2>
+        <span class="count" id="artworkCount">0 pieces</span>
+      </div>
+      <div class="grid" id="artworkGrid">
+        <div class="card addCard" id="addArtworkCard"><span class="plus">+</span>Add artwork</div>
+      </div>
+    </section>
+
+    <!-- ---- FRAMES ---- -->
+    <section class="view" id="view-frames">
+      <div class="sectionHead">
+        <h2>Frame library</h2>
+        <span class="count" id="frameCount">0 mouldings</span>
+      </div>
+      <div class="grid" id="frameGrid">
+        <div class="card addCard" id="addFrameCard"><span class="plus">+</span>Add frame</div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ================= ADD ARTWORK MODAL ================= -->
+<div class="overlay" id="artworkModal">
+  <div class="panel">
+    <h3>Add artwork</h3>
+    <div class="uploadBox" id="artworkUploadBox">
+      <input type="file" id="artworkFile" accept="image/*" style="display:none;">
+      <div id="artworkUploadInner">Click to upload artwork photo</div>
+    </div>
+    <div class="field"><label>Title</label><input type="text" id="artworkTitle" placeholder="e.g. Untitled (Lagos Market)"></div>
+    <div class="row2">
+      <div class="field"><label>Width (mm)</label><input type="number" id="artworkWidth" min="1"></div>
+      <div class="field"><label>Height (mm)</label><input type="number" id="artworkHeight" min="1"></div>
+    </div>
+    <div class="field"><label>Medium</label><input type="text" id="artworkMedium" placeholder="e.g. Oil on canvas"></div>
+    <div class="field">
+      <label>Default requirement</label>
+      <div class="radioRow">
+        <label><input type="radio" name="req" value="frame_only" checked> Frame only</label>
+        <label><input type="radio" name="req" value="frame_and_mount"> Frame + mount board</label>
+      </div>
+    </div>
+    <div class="row2" id="artworkMountFields" style="display:none;">
+      <div class="field"><label>Mount width (mm)</label><input type="number" id="artworkMountWidth" value="70"></div>
+      <div class="field"><label>Mount colour</label><input type="color" id="artworkMountColor" value="#F5F1E8"></div>
+    </div>
+    <div class="error" id="artworkError"></div>
+    <div class="closeRow">
+      <button class="btn secondary" id="artworkCancelBtn">Cancel</button>
+      <button class="btn" id="artworkSaveBtn">Save artwork</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ADD FRAME MODAL ================= -->
+<div class="overlay" id="frameModal">
+  <div class="panel">
+    <h3>Add frame moulding</h3>
+    <div class="uploadBox" id="frameUploadBox">
+      <input type="file" id="frameFile" accept="image/*" style="display:none;">
+      <div id="frameUploadInner">Click to upload a photo of a mitred corner sample<br><span class="mono" style="font-size:11px;">Shoot it square-on, corner at top-left, arms running right &amp; down, even lighting, plain background</span></div>
+    </div>
+    <div class="field"><label>Frame name</label><input type="text" id="frameName" placeholder="e.g. Oslo Oak 32mm"></div>
+    <div class="row2">
+      <div class="field"><label>Face width (mm)</label><input type="number" id="frameWidth" min="1"></div>
+      <div class="field"><label>Rebate depth (mm)</label><input type="number" id="frameDepth" min="1"></div>
+    </div>
+    <div class="field"><label>Notes</label><input type="text" id="frameNotes" placeholder="Optional"></div>
+    <div class="error" id="frameError"></div>
+    <div class="closeRow">
+      <button class="btn secondary" id="frameCancelBtn">Cancel</button>
+      <button class="btn" id="frameSaveBtn">Save frame</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================================
+   Hourglass Frame Visualiser
+   Single-file HTML app. Supabase backend (shared with hourglass-gallery project,
+   tables prefixed fv_ to avoid clashing with the HG Cat schema).
+   ========================================================================= */
+
+const SUPABASE_URL = "https://upgevmtgtmnwprdyjmsw.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_9ZCUyPecvk0BF4MugTktSA_raByVPId";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let state = {
+  user: null,
+  frames: [],
+  artworks: [],
+  currentArtwork: null,
+  selections: [],   // {frame, mountEnabled, mountWidthMm, mountColor}
+  carouselIndex: 0,
+  authMode: "signin"
+};
+
+/* ---------------- helpers ---------------- */
+function $(id){ return document.getElementById(id); }
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("active");
+  clearTimeout(toast._h);
+  toast._h = setTimeout(()=>t.classList.remove("active"), 3200);
+}
+function loadImage(src){
+  return new Promise((resolve,reject)=>{
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = ()=>resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+function fileToPreviewUrl(file){ return URL.createObjectURL(file); }
+
+async function uploadImage(bucket, file){
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `${state.user.id}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const { error } = await sb.storage.from(bucket).upload(path, file, { upsert:false });
+  if(error) throw error;
+  const { data } = sb.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+/* ---------------- auth ---------------- */
+async function initAuth(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session){ onSignedIn(session.user); }
+  sb.auth.onAuthStateChange((event, session)=>{
+    if(event === "SIGNED_IN" && session){ onSignedIn(session.user); }
+    if(event === "SIGNED_OUT"){ onSignedOut(); }
+  });
+}
+function onSignedIn(user){
+  state.user = user;
+  $("authView").style.display = "none";
+  $("topbar").style.display = "flex";
+  $("tabs").style.display = "flex";
+  $("mainArea").style.display = "block";
+  $("userEmail").textContent = user.email;
+  loadFrames();
+  loadArtworks();
+}
+function onSignedOut(){
+  state.user = null;
+  $("authView").style.display = "block";
+  $("topbar").style.display = "none";
+  $("tabs").style.display = "none";
+  $("mainArea").style.display = "none";
+}
+function bindAuthToggle(){
+  document.getElementById("authToggleLink").addEventListener("click", onAuthToggleClick);
+}
+function onAuthToggleClick(){
+  state.authMode = state.authMode === "signin" ? "signup" : "signin";
+  $("authSubmitBtn").textContent = state.authMode === "signin" ? "Sign in" : "Create account";
+  $("authToggleRow").innerHTML = state.authMode === "signin"
+    ? 'New team member? <a id="authToggleLink">Create an account</a>'
+    : 'Already have an account? <a id="authToggleLink">Sign in</a>';
+  bindAuthToggle();
+}
+bindAuthToggle();
+$("authSubmitBtn").addEventListener("click", async ()=>{
+  const email = $("authEmail").value.trim();
+  const password = $("authPassword").value;
+  $("authError").textContent = "";
+  if(!email || !password){ $("authError").textContent = "Enter an email and password."; return; }
+  $("authSubmitBtn").disabled = true;
+  try{
+    if(state.authMode === "signin"){
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if(error) throw error;
+    } else {
+      const { error } = await sb.auth.signUp({ email, password });
+      if(error) throw error;
+      toast("Account created — check your email if confirmation is required, otherwise you're signed in.");
+    }
+  }catch(err){
+    $("authError").textContent = err.message || "Something went wrong.";
+  }
+  $("authSubmitBtn").disabled = false;
+});
+$("signOutBtn").addEventListener("click", async ()=>{ await sb.auth.signOut(); });
+
+/* ---------------- tabs ---------------- */
+document.querySelectorAll("nav.tabs button").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+    $("view-"+btn.dataset.view).classList.add("active");
+  });
+});
+
+/* ---------------- data loading ---------------- */
+async function loadFrames(){
+  const { data, error } = await sb.from("fv_frames").select("*").order("created_at",{ascending:false});
+  if(error){ toast("Couldn't load frames: "+error.message); return; }
+  state.frames = data || [];
+  renderFrameGrid();
+  renderAddFrameSelect();
+}
+async function loadArtworks(){
+  const { data, error } = await sb.from("fv_artworks").select("*").order("created_at",{ascending:false});
+  if(error){ toast("Couldn't load artworks: "+error.message); return; }
+  state.artworks = data || [];
+  renderArtworkGrid();
+  renderArtworkSelect();
+}
+
+/* ---------------- frames tab ---------------- */
+function renderFrameGrid(){
+  const grid = $("frameGrid");
+  grid.querySelectorAll(".card:not(.addCard)").forEach(n=>n.remove());
+  $("frameCount").textContent = state.frames.length + (state.frames.length===1?" moulding":" mouldings");
+  state.frames.forEach(f=>{
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <img class="thumb" src="${f.corner_image_url}" alt="${f.name}">
+      <div class="info">
+        <p class="name">${f.name}</p>
+        <p class="meta">${f.width_mm}mm face &middot; ${f.depth_mm}mm rebate</p>
+      </div>`;
+    grid.insertBefore(card, $("addFrameCard"));
+  });
+}
+$("addFrameCard").addEventListener("click", ()=> openFrameModal());
+function openFrameModal(){
+  $("frameName").value = ""; $("frameWidth").value = ""; $("frameDepth").value = ""; $("frameNotes").value = "";
+  $("frameFile").value = ""; $("frameError").textContent = "";
+  $("frameUploadInner").innerHTML = `Click to upload a photo of a mitred corner sample<br><span class="mono" style="font-size:11px;">Shoot it square-on, corner at top-left, arms running right &amp; down, even lighting, plain background</span>`;
+  $("frameModal").classList.add("active");
+}
+$("frameCancelBtn").addEventListener("click", ()=> $("frameModal").classList.remove("active"));
+$("frameUploadBox").addEventListener("click", ()=> $("frameFile").click());
+$("frameFile").addEventListener("change", ()=>{
+  const f = $("frameFile").files[0];
+  if(!f) return;
+  $("frameUploadInner").innerHTML = `<img src="${fileToPreviewUrl(f)}" alt="">`;
+});
+$("frameSaveBtn").addEventListener("click", async ()=>{
+  const name = $("frameName").value.trim();
+  const width = parseFloat($("frameWidth").value);
+  const depth = parseFloat($("frameDepth").value);
+  const notes = $("frameNotes").value.trim();
+  const file = $("frameFile").files[0];
+  if(!name || !width || !depth || !file){
+    $("frameError").textContent = "Name, face width, rebate depth and a corner photo are all required.";
+    return;
+  }
+  $("frameSaveBtn").disabled = true;
+  try{
+    const url = await uploadImage("fv-frames", file);
+    const { error } = await sb.from("fv_frames").insert({
+      name, width_mm: width, depth_mm: depth, corner_image_url: url,
+      notes: notes || null, created_by: state.user.id
+    });
+    if(error) throw error;
+    $("frameModal").classList.remove("active");
+    toast("Frame saved.");
+    await loadFrames();
+  }catch(err){
+    $("frameError").textContent = err.message || "Couldn't save the frame.";
+  }
+  $("frameSaveBtn").disabled = false;
+});
+
+/* ---------------- artworks tab ---------------- */
+function renderArtworkGrid(){
+  const grid = $("artworkGrid");
+  grid.querySelectorAll(".card:not(.addCard)").forEach(n=>n.remove());
+  $("artworkCount").textContent = state.artworks.length + (state.artworks.length===1?" piece":" pieces");
+  state.artworks.forEach(a=>{
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <img class="thumb" src="${a.image_url}" alt="${a.title}">
+      <div class="info">
+        <p class="name">${a.title}</p>
+        <p class="meta">${a.width_mm}&times;${a.height_mm}mm &middot; ${a.medium || "—"}</p>
+      </div>`;
+    card.addEventListener("click", ()=>{
+      document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("active"));
+      document.querySelector('nav.tabs button[data-view="visualise"]').classList.add("active");
+      document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+      $("view-visualise").classList.add("active");
+      $("artworkSelect").value = a.id;
+      selectArtwork(a.id);
+    });
+    grid.insertBefore(card, $("addArtworkCard"));
+  });
+}
+$("addArtworkCard").addEventListener("click", ()=> openArtworkModal());
+function openArtworkModal(){
+  ["artworkTitle","artworkWidth","artworkHeight","artworkMedium"].forEach(id=>$(id).value="");
+  $("artworkFile").value = "";
+  $("artworkMountWidth").value = 70;
+  $("artworkMountColor").value = "#F5F1E8";
+  document.querySelector('input[name="req"][value="frame_only"]').checked = true;
+  $("artworkMountFields").style.display = "none";
+  $("artworkError").textContent = "";
+  $("artworkUploadInner").textContent = "Click to upload artwork photo";
+  $("artworkModal").classList.add("active");
+}
+$("artworkCancelBtn").addEventListener("click", ()=> $("artworkModal").classList.remove("active"));
+$("artworkUploadBox").addEventListener("click", ()=> $("artworkFile").click());
+$("artworkFile").addEventListener("change", ()=>{
+  const f = $("artworkFile").files[0];
+  if(!f) return;
+  $("artworkUploadInner").innerHTML = `<img src="${fileToPreviewUrl(f)}" alt="">`;
+});
+document.querySelectorAll('input[name="req"]').forEach(r=>{
+  r.addEventListener("change", ()=>{
+    $("artworkMountFields").style.display = document.querySelector('input[name="req"]:checked').value === "frame_and_mount" ? "grid" : "none";
+  });
+});
+$("artworkSaveBtn").addEventListener("click", async ()=>{
+  const title = $("artworkTitle").value.trim();
+  const width = parseFloat($("artworkWidth").value);
+  const height = parseFloat($("artworkHeight").value);
+  const medium = $("artworkMedium").value.trim();
+  const requirement = document.querySelector('input[name="req"]:checked').value;
+  const mountWidth = parseFloat($("artworkMountWidth").value) || null;
+  const mountColor = $("artworkMountColor").value;
+  const file = $("artworkFile").files[0];
+  if(!title || !width || !height || !file){
+    $("artworkError").textContent = "Title, width, height and an artwork photo are all required.";
+    return;
+  }
+  $("artworkSaveBtn").disabled = true;
+  try{
+    const url = await uploadImage("fv-artworks", file);
+    const { error } = await sb.from("fv_artworks").insert({
+      title, width_mm: width, height_mm: height, medium: medium || null,
+      requirement, mount_width_mm: requirement==="frame_and_mount" ? mountWidth : null,
+      mount_color: mountColor, image_url: url, created_by: state.user.id
+    });
+    if(error) throw error;
+    $("artworkModal").classList.remove("active");
+    toast("Artwork saved.");
+    await loadArtworks();
+  }catch(err){
+    $("artworkError").textContent = err.message || "Couldn't save the artwork.";
+  }
+  $("artworkSaveBtn").disabled = false;
+});
+
+/* ---------------- visualiser ---------------- */
+function renderArtworkSelect(){
+  const sel = $("artworkSelect");
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Select artwork&hellip;</option>' +
+    state.artworks.map(a=>`<option value="${a.id}">${a.title} (${a.width_mm}&times;${a.height_mm}mm)</option>`).join("");
+  if(cur) sel.value = cur;
+}
+function renderAddFrameSelect(){
+  const sel = $("addFrameSelect");
+  sel.innerHTML = '<option value="">Add a frame&hellip;</option>' +
+    state.frames.map(f=>`<option value="${f.id}">${f.name} (${f.width_mm}mm)</option>`).join("");
+}
+$("artworkSelect").addEventListener("change", (e)=> selectArtwork(e.target.value));
+
+function selectArtwork(id){
+  const a = state.artworks.find(x=>x.id===id);
+  state.currentArtwork = a || null;
+  state.selections = [];
+  state.carouselIndex = 0;
+  if(!a){
+    $("awPreview").style.display = "none";
+    $("frameChooser").style.display = "none";
+    renderStage();
+    return;
+  }
+  $("awPreview").style.display = "block";
+  $("awPreviewImg").src = a.image_url;
+  $("awPreviewSpecs").innerHTML = `
+    <div><b>${a.width_mm} &times; ${a.height_mm} mm</b></div>
+    <div>${a.medium || "Medium not set"}</div>
+    <div>${a.requirement === "frame_and_mount" ? "Frame + mount board" : "Frame only"}</div>`;
+  $("frameChooser").style.display = "block";
+
+  $("mountToggle").checked = a.requirement === "frame_and_mount";
+  $("mountWidthInput").value = a.mount_width_mm || 70;
+  $("mountColorInput").value = a.mount_color || "#F5F1E8";
+  toggleMountFields();
+
+  renderFrameChips();
+  renderStage();
+}
+function toggleMountFields(){
+  const on = $("mountToggle").checked;
+  $("mountWidthField").style.display = on ? "block" : "none";
+  $("mountColorField").style.display = on ? "block" : "none";
+}
+$("mountToggle").addEventListener("change", ()=>{ toggleMountFields(); syncMountOptsToSelections(); renderStage(); });
+$("mountWidthInput").addEventListener("input", ()=>{ syncMountOptsToSelections(); renderStage(); });
+$("mountColorInput").addEventListener("input", ()=>{ syncMountOptsToSelections(); renderStage(); });
+function syncMountOptsToSelections(){
+  const on = $("mountToggle").checked;
+  const w = parseFloat($("mountWidthInput").value) || 0;
+  const c = $("mountColorInput").value;
+  state.selections.forEach(s=>{ s.mountEnabled = on; s.mountWidthMm = w; s.mountColor = c; });
+}
+
+$("addFrameSelect").addEventListener("change", (e)=>{
+  const id = e.target.value;
+  if(!id) return;
+  const frame = state.frames.find(f=>f.id===id);
+  if(!frame) return;
+  if(state.selections.find(s=>s.frame.id===id)){ toast("That frame is already in the carousel."); e.target.value=""; return; }
+  state.selections.push({
+    frame,
+    mountEnabled: $("mountToggle").checked,
+    mountWidthMm: parseFloat($("mountWidthInput").value) || 0,
+    mountColor: $("mountColorInput").value
+  });
+  state.carouselIndex = state.selections.length - 1;
+  e.target.value = "";
+  renderFrameChips();
+  renderStage();
+});
+function renderFrameChips(){
+  const list = $("frameChipList");
+  list.innerHTML = "";
+  state.selections.forEach((s,i)=>{
+    const chip = document.createElement("div");
+    chip.className = "frameChip";
+    chip.innerHTML = `<img src="${s.frame.corner_image_url}"><span class="fname">${s.frame.name}</span><button data-i="${i}">&times;</button>`;
+    chip.querySelector("button").addEventListener("click", ()=>{
+      state.selections.splice(i,1);
+      if(state.carouselIndex >= state.selections.length) state.carouselIndex = Math.max(0, state.selections.length-1);
+      renderFrameChips();
+      renderStage();
+    });
+    list.appendChild(chip);
+  });
+}
+
+$("prevFrameBtn").addEventListener("click", ()=>{
+  if(state.selections.length===0) return;
+  state.carouselIndex = (state.carouselIndex - 1 + state.selections.length) % state.selections.length;
+  renderStage();
+});
+$("nextFrameBtn").addEventListener("click", ()=>{
+  if(state.selections.length===0) return;
+  state.carouselIndex = (state.carouselIndex + 1) % state.selections.length;
+  renderStage();
+});
+
+async function renderStage(){
+  const wrap = $("canvasWrap");
+  const empty = $("emptyStage");
+  const canvas = $("previewCanvas");
+  const nav = $("carouselNav");
+
+  if(!state.currentArtwork || state.selections.length===0){
+    empty.style.display = "block";
+    canvas.style.display = "none";
+    nav.style.display = "none";
+    $("stageFrameName").textContent = "\u00A0";
+    $("frameCaption").textContent = "";
+    return;
+  }
+  empty.style.display = "none";
+  canvas.style.display = "block";
+  nav.style.display = state.selections.length > 1 ? "flex" : "none";
+  $("carouselIdx").textContent = `${state.carouselIndex+1} / ${state.selections.length}`;
+
+  const sel = state.selections[state.carouselIndex];
+  $("stageFrameName").textContent = sel.frame.name;
+  $("frameCaption").innerHTML = `<b>${sel.frame.width_mm}mm</b> face &middot; <b>${sel.frame.depth_mm}mm</b> rebate` +
+    (sel.mountEnabled ? ` &middot; <b>${sel.mountWidthMm}mm</b> mount` : ` &middot; no mount`);
+
+  try{
+    await compositeFramePreview(canvas, state.currentArtwork, sel);
+  }catch(err){
+    console.error(err);
+    toast("Couldn't render this preview: " + (err.message||err));
+  }
+}
+
+/* ---------------- compositing engine ----------------
+   Builds a to-scale frame preview from a single mitred-corner photo by:
+   - using the corner photo (rotated per corner) as the four corner tiles
+   - cropping a mid-band strip from the corner photo as a repeating texture,
+     tiled along the straight runs between corners
+   Frame / mount widths are scaled against the artwork's real-world size in mm,
+   so relative proportions stay accurate regardless of on-screen size.
+------------------------------------------------------- */
+const imgCache = {};
+async function cachedImage(url){
+  if(!imgCache[url]) imgCache[url] = loadImage(url);
+  return imgCache[url];
+}
+
+function makeCornerTile(cornerImg, sizePx, rotationDeg){
+  const c = document.createElement("canvas");
+  c.width = sizePx; c.height = sizePx;
+  const ctx = c.getContext("2d");
+  ctx.save();
+  ctx.translate(sizePx/2, sizePx/2);
+  ctx.rotate(rotationDeg * Math.PI/180);
+  ctx.drawImage(cornerImg, -sizePx/2, -sizePx/2, sizePx, sizePx);
+  ctx.restore();
+  return c;
+}
+
+function makeStripPattern(ctx, cornerImg, thicknessPx, vertical){
+  // Sample a mid-band of the corner photo (avoiding the corner point itself)
+  // as a repeating texture for the straight runs of the frame.
+  const sw = cornerImg.width, sh = cornerImg.height;
+  const bandY = sh * 0.38, bandH = sh * 0.24;
+  const bandX = sw * 0.15, bandW = sw * 0.7;
+
+  const tileLen = Math.max(24, Math.round(thicknessPx * 1.4));
+  const tc = document.createElement("canvas");
+  if(!vertical){
+    tc.width = tileLen; tc.height = thicknessPx;
+    tc.getContext("2d").drawImage(cornerImg, bandX, bandY, bandW, bandH, 0, 0, tileLen, thicknessPx);
+  } else {
+    tc.width = thicknessPx; tc.height = tileLen;
+    const t = tc.getContext("2d");
+    t.save();
+    t.translate(thicknessPx/2, tileLen/2);
+    t.rotate(Math.PI/2);
+    t.drawImage(cornerImg, bandX, bandY, bandW, bandH, -tileLen/2, -thicknessPx/2, tileLen, thicknessPx);
+    t.restore();
+  }
+  return ctx.createPattern(tc, "repeat");
+}
+
+async function compositeFramePreview(canvas, artwork, selection){
+  const [artImg, cornerImg] = await Promise.all([
+    cachedImage(artwork.image_url),
+    cachedImage(selection.frame.corner_image_url)
+  ]);
+
+  // --- scale plan: fit the artwork+mount+frame stack into a max display box,
+  // computed from real-world mm so proportions are accurate ---
+  const MAX_W = 720, MAX_H = 620;
+  const mountMm = selection.mountEnabled ? (selection.mountWidthMm || 0) : 0;
+  const frameMm = selection.frame.width_mm;
+
+  const totalWmm = artwork.width_mm + 2*mountMm + 2*frameMm;
+  const totalHmm = artwork.height_mm + 2*mountMm + 2*frameMm;
+  const scale = Math.min(MAX_W/totalWmm, MAX_H/totalHmm);
+
+  const artWpx = artwork.width_mm * scale;
+  const artHpx = artwork.height_mm * scale;
+  const mountPx = mountMm * scale;
+  const framePx = Math.max(10, frameMm * scale);
+
+  const pad = 26; // room for drop shadow
+  const innerW = artWpx + 2*mountPx;
+  const innerH = artHpx + 2*mountPx;
+  const outerW = innerW + 2*framePx;
+  const outerH = innerH + 2*framePx;
+
+  canvas.width = outerW + pad*2;
+  canvas.height = outerH + pad*2;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const ox = pad, oy = pad; // outer frame top-left
+
+  // drop shadow
+  ctx.save();
+  ctx.shadowColor = "rgba(14,27,51,0.45)";
+  ctx.shadowBlur = 22;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 10;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(ox, oy, outerW, outerH);
+  ctx.restore();
+
+  // --- frame annulus (outer rect minus inner rect) ---
+  const ix = ox + framePx, iy = oy + framePx;
+  ctx.save();
+  const path = new Path2D();
+  path.rect(ox, oy, outerW, outerH);
+  path.rect(ix, iy, innerW, innerH);
+  ctx.clip(path, "evenodd");
+
+  // corner tiles
+  const cornerSize = framePx;
+  const tl = makeCornerTile(cornerImg, cornerSize, 0);
+  const tr = makeCornerTile(cornerImg, cornerSize, 90);
+  const br = makeCornerTile(cornerImg, cornerSize, 180);
+  const bl = makeCornerTile(cornerImg, cornerSize, 270);
+  ctx.drawImage(tl, ox, oy, cornerSize, cornerSize);
+  ctx.drawImage(tr, ox+outerW-cornerSize, oy, cornerSize, cornerSize);
+  ctx.drawImage(br, ox+outerW-cornerSize, oy+outerH-cornerSize, cornerSize, cornerSize);
+  ctx.drawImage(bl, ox, oy+outerH-cornerSize, cornerSize, cornerSize);
+
+  // straight runs, tiled
+  const hPattern = makeStripPattern(ctx, cornerImg, framePx, false);
+  const vPattern = makeStripPattern(ctx, cornerImg, framePx, true);
+  ctx.fillStyle = hPattern;
+  ctx.save(); ctx.translate(ox+cornerSize, oy); ctx.fillRect(0,0, outerW-2*cornerSize, framePx); ctx.restore();
+  ctx.save(); ctx.translate(ox+cornerSize, oy+outerH-framePx); ctx.fillRect(0,0, outerW-2*cornerSize, framePx); ctx.restore();
+  ctx.fillStyle = vPattern;
+  ctx.save(); ctx.translate(ox, oy+cornerSize); ctx.fillRect(0,0, framePx, outerH-2*cornerSize); ctx.restore();
+  ctx.save(); ctx.translate(ox+outerW-framePx, oy+cornerSize); ctx.fillRect(0,0, framePx, outerH-2*cornerSize); ctx.restore();
+
+  // subtle inner bevel of the frame rebate
+  ctx.strokeStyle = "rgba(0,0,0,0.35)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(ix, iy, innerW, innerH);
+  ctx.restore();
+
+  // --- mount board ---
+  if(mountPx > 0.5){
+    ctx.save();
+    ctx.fillStyle = selection.mountColor || "#F5F1E8";
+    ctx.fillRect(ix, iy, innerW, innerH);
+    // gentle inner bevel shadow toward the artwork opening
+    const bx = ix+mountPx, by = iy+mountPx;
+    const grad = ctx.createLinearGradient(bx, by, bx+14, by+14);
+    grad.addColorStop(0, "rgba(0,0,0,0.28)");
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx, by, artWpx, 14);
+    ctx.fillRect(bx, by, 14, artHpx);
+    ctx.restore();
+  }
+
+  // --- artwork ---
+  const axp = ix + mountPx, ayp = iy + mountPx;
+  ctx.drawImage(artImg, axp, ayp, artWpx, artHpx);
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(axp, ayp, artWpx, artHpx);
+}
+
+/* ---------------- boot ---------------- */
+initAuth();
+</script>
+</body>
+</html>
