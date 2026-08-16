@@ -41,6 +41,10 @@
   header.topbar .user-row{display:flex;align-items:center;gap:14px;font-size:13px;color:#C7D2E5;}
   header.topbar .user-row button{background:transparent;border:1px solid #3C517A;color:#C7D2E5;padding:6px 12px;font-size:12px;}
   header.topbar .user-row button:hover{border-color:var(--orange-bright);color:#fff;}
+  .unitToggle{display:flex;border:1px solid #3C517A;}
+  .unitToggleBtn{background:transparent;border:none;color:#9FB0CC;padding:6px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+  .unitToggleBtn.active{background:var(--orange-bright);color:#fff;}
+  .unitToggleBtn:not(.active):hover{color:#fff;}
 
   nav.tabs{display:flex;background:var(--navy-dark);padding:0 28px;}
   nav.tabs button{
@@ -90,6 +94,10 @@
   .card .info{padding:10px 12px;}
   .card .info .name{font-size:14px;font-weight:600;margin:0 0 2px;}
   .card .info .meta{font-size:11px;color:var(--ink-soft);margin:0;}
+  .card .cardActions{display:flex;gap:6px;padding:0 12px 12px;}
+  .card .cardActions button{flex:1;font-size:11px;padding:6px 4px;background:var(--paper);border:1px solid var(--line);color:var(--ink-soft);}
+  .card .cardActions button:hover{border-color:var(--navy);color:var(--navy);}
+  .card .cardActions button.danger:hover{border-color:#A32020;color:#A32020;}
   .card.addCard{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;border:2px dashed var(--line);background:transparent;min-height:190px;color:var(--ink-soft);}
   .card.addCard:hover{border-color:var(--orange);color:var(--orange);}
   .card.addCard .plus{font-size:28px;line-height:1;}
@@ -119,10 +127,16 @@
   .frameChooser{margin-top:20px;}
   .frameChooser h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px;color:var(--ink-soft);}
   .frameChip{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);margin-bottom:6px;font-size:12px;background:var(--paper);}
-  .frameChip img{width:28px;height:28px;object-fit:cover;}
+  .frameChip .stackThumbs{display:flex;flex-shrink:0;}
+  .frameChip .stackThumbs img{width:22px;height:22px;object-fit:cover;border:1px solid var(--white);margin-left:-8px;}
+  .frameChip .stackThumbs img:first-child{margin-left:0;}
   .frameChip .fname{flex:1;}
   .frameChip button{background:transparent;border:none;color:var(--ink-soft);font-size:16px;line-height:1;}
   .frameChip button:hover{color:#A32020;}
+  .stackBuilder{background:var(--paper);border:1px solid var(--line);padding:12px;margin-bottom:12px;}
+  .stackBuilder .field{margin-bottom:8px;}
+  .stackBuilder .field label{font-size:10px;}
+  .stackBuilder .field:last-of-type{margin-bottom:10px;}
   .addFrameBtn{width:100%;font-size:12px;padding:8px;}
 
   .mountControls{margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
@@ -198,6 +212,10 @@
       </div>
     </div>
     <div class="user-row">
+      <div class="unitToggle" id="unitToggle">
+        <button class="unitToggleBtn" data-unit="in" type="button">in</button>
+        <button class="unitToggleBtn" data-unit="cm" type="button">cm</button>
+      </div>
       <span id="userEmail"></span>
       <button id="signOutBtn">Sign out</button>
     </div>
@@ -227,15 +245,21 @@
           </div>
 
           <div class="frameChooser" id="frameChooser" style="display:none;">
-            <h3>Frame options in this carousel</h3>
+            <h3>Looks in this carousel</h3>
             <div id="frameChipList"></div>
-            <select id="addFrameSelect" class="addFrameBtn" style="margin-bottom:6px;"><option value="">Add a frame&hellip;</option></select>
+
+            <div class="stackBuilder" id="stackBuilder">
+              <div class="field"><label>Outer frame</label><select id="stackOuterSelect"></select></div>
+              <div class="field"><label>Middle frame (optional)</label><select id="stackMiddleSelect"></select></div>
+              <div class="field"><label>Inner frame (optional)</label><select id="stackInnerSelect"></select></div>
+              <button class="btn secondary addFrameBtn" id="addStackBtn" type="button">Add this look to carousel</button>
+            </div>
 
             <div class="mountControls" id="mountControls">
               <label><input type="checkbox" id="mountToggle"> Show mount board</label>
               <div class="field" id="mountWidthField" style="display:none;">
-                <label>Mount width (mm)</label>
-                <input type="number" id="mountWidthInput" value="70" min="0" step="5">
+                <label>Mount width (<span class="unitLabel">in</span>)</label>
+                <input type="number" id="mountWidthInput" class="unitField" min="0" step="any">
               </div>
               <div class="field" id="mountColorField" style="display:none;">
                 <label>Mount colour</label>
@@ -298,8 +322,8 @@
     </div>
     <div class="field"><label>Title</label><input type="text" id="artworkTitle" placeholder="e.g. Untitled (Lagos Market)"></div>
     <div class="row2">
-      <div class="field"><label>Width (mm)</label><input type="number" id="artworkWidth" min="1"></div>
-      <div class="field"><label>Height (mm)</label><input type="number" id="artworkHeight" min="1"></div>
+      <div class="field"><label>Width (<span class="unitLabel">in</span>)</label><input type="number" id="artworkWidth" class="unitField" min="0" step="any"></div>
+      <div class="field"><label>Height (<span class="unitLabel">in</span>)</label><input type="number" id="artworkHeight" class="unitField" min="0" step="any"></div>
     </div>
     <div class="field"><label>Medium</label><input type="text" id="artworkMedium" placeholder="e.g. Oil on canvas"></div>
     <div class="field">
@@ -310,7 +334,7 @@
       </div>
     </div>
     <div class="row2" id="artworkMountFields" style="display:none;">
-      <div class="field"><label>Mount width (mm)</label><input type="number" id="artworkMountWidth" value="70"></div>
+      <div class="field"><label>Mount width (<span class="unitLabel">in</span>)</label><input type="number" id="artworkMountWidth" class="unitField" step="any"></div>
       <div class="field"><label>Mount colour</label><input type="color" id="artworkMountColor" value="#F5F1E8"></div>
     </div>
     <div class="error" id="artworkError"></div>
@@ -324,7 +348,7 @@
 <!-- ================= ADD FRAME MODAL ================= -->
 <div class="overlay" id="frameModal">
   <div class="panel">
-    <h3>Add frame moulding</h3>
+    <h3 id="frameModalTitle">Add frame moulding</h3>
 
     <div class="uploadBox" id="frameUploadBox">
       <input type="file" id="frameFile" accept="image/*" style="display:none;">
@@ -350,10 +374,10 @@
       </div>
     </div>
 
-    <div class="field"><label>Frame name</label><input type="text" id="frameName" placeholder="e.g. Oslo Oak 32mm"></div>
+    <div class="field"><label>Frame name</label><input type="text" id="frameName" placeholder="e.g. Oslo Oak"></div>
     <div class="row2">
-      <div class="field"><label>Face width (mm)</label><input type="number" id="frameWidth" min="1"></div>
-      <div class="field"><label>Rebate depth (mm)</label><input type="number" id="frameDepth" min="1"></div>
+      <div class="field"><label>Face width (<span class="unitLabel">in</span>)</label><input type="number" id="frameWidth" class="unitField" min="0" step="any"></div>
+      <div class="field"><label>Rebate depth (<span class="unitLabel">in</span>)</label><input type="number" id="frameDepth" class="unitField" min="0" step="any"></div>
     </div>
     <div class="field"><label>Notes</label><input type="text" id="frameNotes" placeholder="Optional"></div>
     <div class="error" id="frameError"></div>
@@ -382,10 +406,52 @@ let state = {
   frames: [],
   artworks: [],
   currentArtwork: null,
-  selections: [],   // {frame, mountEnabled, mountWidthMm, mountColor}
+  selections: [],   // {frames:[frame1,frame2,frame3] outer->inner, mountEnabled, mountWidthMm, mountColor}
   carouselIndex: 0,
-  authMode: "signin"
+  authMode: "signin",
+  editingFrame: null,
+  unit: localStorage.getItem("fv_unit") || "in"   // all measurements are stored in mm; this only affects display/input
 };
+
+/* ---------------- units ---------------- */
+// mm is the single source of truth everywhere in state and in Supabase —
+// these just convert at the UI boundary so the form fields can show inches
+// (default) or centimetres without changing any stored or rendered value.
+function toMm(value, unit){ return unit === "in" ? value * 25.4 : value * 10; }
+function fromMm(mm, unit){ return unit === "in" ? mm / 25.4 : mm / 10; }
+function round2(n){ return Math.round(n * 100) / 100; }
+function fmtUnit(mm){ return round2(fromMm(mm, state.unit)); }
+function unitToMmCurrent(value){ return toMm(value, state.unit); }
+function setUnit(newUnit){
+  if(newUnit === state.unit) return;
+  // live-convert whatever's currently typed in any open unit-tagged field
+  document.querySelectorAll(".unitField").forEach(el=>{
+    const v = parseFloat(el.value);
+    if(!isNaN(v)) el.value = round2(fromMm(toMm(v, state.unit), newUnit));
+  });
+  state.unit = newUnit;
+  localStorage.setItem("fv_unit", newUnit);
+  document.querySelectorAll(".unitLabel").forEach(el=> el.textContent = newUnit);
+  document.querySelectorAll(".unitToggleBtn").forEach(b=> b.classList.toggle("active", b.dataset.unit === newUnit));
+  renderFrameGrid();
+  renderArtworkGrid();
+  renderArtworkSelect();
+  renderStackSelects();
+  renderFrameChips();
+  if(state.currentArtwork){
+    const a = state.currentArtwork;
+    $("awPreviewSpecs").innerHTML = `
+      <div><b>${fmtUnit(a.width_mm)} &times; ${fmtUnit(a.height_mm)} ${state.unit}</b></div>
+      <div>${a.medium || "Medium not set"}</div>
+      <div>${a.requirement === "frame_and_mount" ? "Frame + mount board" : "Frame only"}</div>`;
+  }
+  renderStage();
+}
+document.querySelectorAll(".unitToggleBtn").forEach(b=>{
+  b.classList.toggle("active", b.dataset.unit === state.unit);
+  b.addEventListener("click", ()=> setUnit(b.dataset.unit));
+});
+document.querySelectorAll(".unitLabel").forEach(el=> el.textContent = state.unit);
 
 /* ---------------- helpers ---------------- */
 function $(id){ return document.getElementById(id); }
@@ -492,7 +558,7 @@ async function loadFrames(){
   if(error){ toast("Couldn't load frames: "+error.message); return; }
   state.frames = data || [];
   renderFrameGrid();
-  renderAddFrameSelect();
+  renderStackSelects();
 }
 async function loadArtworks(){
   const { data, error } = await sb.from("fv_artworks").select("*").order("created_at",{ascending:false});
@@ -514,23 +580,49 @@ function renderFrameGrid(){
       <img class="thumb" src="${f.corner_image_url}" alt="${f.name}">
       <div class="info">
         <p class="name">${f.name}</p>
-        <p class="meta">${f.width_mm}mm face &middot; ${f.depth_mm}mm rebate</p>
+        <p class="meta">${fmtUnit(f.width_mm)}${state.unit} face &middot; ${fmtUnit(f.depth_mm)}${state.unit} rebate</p>
+      </div>
+      <div class="cardActions">
+        <button class="editBtn" type="button">Edit</button>
+        <button class="deleteBtn danger" type="button">Delete</button>
       </div>`;
+    card.querySelector(".editBtn").addEventListener("click", (e)=>{ e.stopPropagation(); openFrameModal(f); });
+    card.querySelector(".deleteBtn").addEventListener("click", (e)=>{ e.stopPropagation(); deleteFrame(f); });
     grid.insertBefore(card, $("addFrameCard"));
   });
 }
-$("addFrameCard").addEventListener("click", ()=> openFrameModal());
-function openFrameModal(){
-  $("frameName").value = ""; $("frameWidth").value = ""; $("frameDepth").value = ""; $("frameNotes").value = "";
+async function deleteFrame(frame){
+  if(!confirm(`Delete "${frame.name}"? This can't be undone.`)) return;
+  const { error } = await sb.from("fv_frames").delete().eq("id", frame.id);
+  if(error){ toast("Couldn't delete: " + error.message); return; }
+  // drop it from any look currently being previewed
+  state.selections = state.selections.filter(s => !s.frames.some(fr => fr.id === frame.id));
+  if(state.carouselIndex >= state.selections.length) state.carouselIndex = Math.max(0, state.selections.length-1);
+  toast("Frame deleted.");
+  await loadFrames();
+  renderFrameChips();
+  renderStage();
+}
+$("addFrameCard").addEventListener("click", ()=> openFrameModal(null));
+function openFrameModal(frame){
+  state.editingFrame = frame || null;
+  $("frameName").value = frame ? frame.name : "";
+  $("frameWidth").value = frame ? fmtUnit(frame.width_mm) : "";
+  $("frameDepth").value = frame ? fmtUnit(frame.depth_mm) : "";
+  $("frameNotes").value = frame && frame.notes ? frame.notes : "";
   $("frameFile").value = ""; $("frameError").textContent = "";
-  $("frameUploadInner").innerHTML = `Click to upload a photo of the moulding<br><span class="mono" style="font-size:11px;">About 4 inches of a straight, flat length is ideal — no corner needed</span>`;
+  $("frameModalTitle").textContent = frame ? "Edit frame moulding" : "Add frame moulding";
+  $("frameSaveBtn").textContent = frame ? "Save changes" : "Save frame";
+  $("frameUploadInner").innerHTML = frame
+    ? `<img src="${frame.corner_image_url}" alt=""><div class="mono" style="font-size:11px;margin-top:6px;color:var(--ink-soft);">Current photo — click to replace</div>`
+    : `Click to upload a photo of the moulding<br><span class="mono" style="font-size:11px;">About 4 inches of a straight, flat length is ideal — no corner needed</span>`;
   $("cropStage").classList.remove("active");
   $("cropResultRow").classList.remove("active");
   $("cropStatus").textContent = "";
   crop.blob = null;
   $("frameModal").classList.add("active");
 }
-$("frameCancelBtn").addEventListener("click", ()=> $("frameModal").classList.remove("active"));
+$("frameCancelBtn").addEventListener("click", ()=>{ state.editingFrame = null; $("frameModal").classList.remove("active"); });
 $("frameUploadBox").addEventListener("click", ()=> $("frameFile").click());
 $("frameFile").addEventListener("change", ()=>{
   const f = $("frameFile").files[0];
@@ -540,24 +632,41 @@ $("frameFile").addEventListener("change", ()=>{
 });
 $("frameSaveBtn").addEventListener("click", async ()=>{
   const name = $("frameName").value.trim();
-  const width = parseFloat($("frameWidth").value);
-  const depth = parseFloat($("frameDepth").value);
+  const width = unitToMmCurrent(parseFloat($("frameWidth").value));
+  const depth = unitToMmCurrent(parseFloat($("frameDepth").value));
   const notes = $("frameNotes").value.trim();
-  if(!name || !width || !depth || !crop.blob){
+  const editing = state.editingFrame;
+  if(!name || !width || !depth || (!editing && !crop.blob)){
     $("frameError").textContent = "Name, face width, rebate depth, and a texture patch are all required.";
     return;
   }
   $("frameSaveBtn").disabled = true;
   try{
-    const url = await uploadImage("fv-frames", crop.blob, "png");
-    const { error } = await sb.from("fv_frames").insert({
-      name, width_mm: width, depth_mm: depth, corner_image_url: url,
-      notes: notes || null, created_by: state.user.id
-    });
-    if(error) throw error;
+    let imageUrl = editing ? editing.corner_image_url : null;
+    if(crop.blob) imageUrl = await uploadImage("fv-frames", crop.blob, "png");
+    if(editing){
+      const { error } = await sb.from("fv_frames").update({
+        name, width_mm: width, depth_mm: depth, corner_image_url: imageUrl, notes: notes || null
+      }).eq("id", editing.id);
+      if(error) throw error;
+      toast("Frame updated.");
+    } else {
+      const { error } = await sb.from("fv_frames").insert({
+        name, width_mm: width, depth_mm: depth, corner_image_url: imageUrl,
+        notes: notes || null, created_by: state.user.id
+      });
+      if(error) throw error;
+      toast("Frame saved.");
+    }
     $("frameModal").classList.remove("active");
-    toast("Frame saved.");
+    state.editingFrame = null;
     await loadFrames();
+    // keep any in-progress "looks" in sync with the edited frame's new data
+    state.selections.forEach(s=>{
+      s.frames = s.frames.map(fr => state.frames.find(x=>x.id===fr.id) || fr);
+    });
+    renderFrameChips();
+    renderStage();
   }catch(err){
     $("frameError").textContent = err.message || "Couldn't save the frame.";
   }
@@ -663,7 +772,7 @@ function renderArtworkGrid(){
       <img class="thumb" src="${a.image_url}" alt="${a.title}">
       <div class="info">
         <p class="name">${a.title}</p>
-        <p class="meta">${a.width_mm}&times;${a.height_mm}mm &middot; ${a.medium || "—"}</p>
+        <p class="meta">${fmtUnit(a.width_mm)}&times;${fmtUnit(a.height_mm)}${state.unit} &middot; ${a.medium || "—"}</p>
       </div>`;
     card.addEventListener("click", ()=>{
       document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("active"));
@@ -680,7 +789,7 @@ $("addArtworkCard").addEventListener("click", ()=> openArtworkModal());
 function openArtworkModal(){
   ["artworkTitle","artworkWidth","artworkHeight","artworkMedium"].forEach(id=>$(id).value="");
   $("artworkFile").value = "";
-  $("artworkMountWidth").value = 70;
+  $("artworkMountWidth").value = fmtUnit(70);
   $("artworkMountColor").value = "#F5F1E8";
   document.querySelector('input[name="req"][value="frame_only"]').checked = true;
   $("artworkMountFields").style.display = "none";
@@ -702,11 +811,12 @@ document.querySelectorAll('input[name="req"]').forEach(r=>{
 });
 $("artworkSaveBtn").addEventListener("click", async ()=>{
   const title = $("artworkTitle").value.trim();
-  const width = parseFloat($("artworkWidth").value);
-  const height = parseFloat($("artworkHeight").value);
+  const width = unitToMmCurrent(parseFloat($("artworkWidth").value));
+  const height = unitToMmCurrent(parseFloat($("artworkHeight").value));
   const medium = $("artworkMedium").value.trim();
   const requirement = document.querySelector('input[name="req"]:checked').value;
-  const mountWidth = parseFloat($("artworkMountWidth").value) || null;
+  const mountWidthRaw = parseFloat($("artworkMountWidth").value);
+  const mountWidth = isNaN(mountWidthRaw) ? null : unitToMmCurrent(mountWidthRaw);
   const mountColor = $("artworkMountColor").value;
   const file = $("artworkFile").files[0];
   if(!title || !width || !height || !file){
@@ -736,13 +846,18 @@ function renderArtworkSelect(){
   const sel = $("artworkSelect");
   const cur = sel.value;
   sel.innerHTML = '<option value="">Select artwork&hellip;</option>' +
-    state.artworks.map(a=>`<option value="${a.id}">${a.title} (${a.width_mm}&times;${a.height_mm}mm)</option>`).join("");
+    state.artworks.map(a=>`<option value="${a.id}">${a.title} (${fmtUnit(a.width_mm)}&times;${fmtUnit(a.height_mm)}${state.unit})</option>`).join("");
   if(cur) sel.value = cur;
 }
-function renderAddFrameSelect(){
-  const sel = $("addFrameSelect");
-  sel.innerHTML = '<option value="">Add a frame&hellip;</option>' +
-    state.frames.map(f=>`<option value="${f.id}">${f.name} (${f.width_mm}mm)</option>`).join("");
+function renderStackSelects(){
+  const opts = state.frames.map(f=>`<option value="${f.id}">${f.name} (${fmtUnit(f.width_mm)}${state.unit})</option>`).join("");
+  const cur = { outer: $("stackOuterSelect").value, middle: $("stackMiddleSelect").value, inner: $("stackInnerSelect").value };
+  $("stackOuterSelect").innerHTML = '<option value="">Select outer frame&hellip;</option>' + opts;
+  $("stackMiddleSelect").innerHTML = '<option value="">None&hellip;</option>' + opts;
+  $("stackInnerSelect").innerHTML = '<option value="">None&hellip;</option>' + opts;
+  if(state.frames.find(f=>f.id===cur.outer)) $("stackOuterSelect").value = cur.outer;
+  if(state.frames.find(f=>f.id===cur.middle)) $("stackMiddleSelect").value = cur.middle;
+  if(state.frames.find(f=>f.id===cur.inner)) $("stackInnerSelect").value = cur.inner;
 }
 $("artworkSelect").addEventListener("change", (e)=> selectArtwork(e.target.value));
 
@@ -760,13 +875,13 @@ function selectArtwork(id){
   $("awPreview").style.display = "block";
   $("awPreviewImg").src = a.image_url;
   $("awPreviewSpecs").innerHTML = `
-    <div><b>${a.width_mm} &times; ${a.height_mm} mm</b></div>
+    <div><b>${fmtUnit(a.width_mm)} &times; ${fmtUnit(a.height_mm)} ${state.unit}</b></div>
     <div>${a.medium || "Medium not set"}</div>
     <div>${a.requirement === "frame_and_mount" ? "Frame + mount board" : "Frame only"}</div>`;
   $("frameChooser").style.display = "block";
 
   $("mountToggle").checked = a.requirement === "frame_and_mount";
-  $("mountWidthInput").value = a.mount_width_mm || 70;
+  $("mountWidthInput").value = fmtUnit(a.mount_width_mm || 70);
   $("mountColorInput").value = a.mount_color || "#F5F1E8";
   toggleMountFields();
 
@@ -783,25 +898,23 @@ $("mountWidthInput").addEventListener("input", ()=>{ syncMountOptsToSelections()
 $("mountColorInput").addEventListener("input", ()=>{ syncMountOptsToSelections(); renderStage(); });
 function syncMountOptsToSelections(){
   const on = $("mountToggle").checked;
-  const w = parseFloat($("mountWidthInput").value) || 0;
+  const w = unitToMmCurrent(parseFloat($("mountWidthInput").value)) || 0;
   const c = $("mountColorInput").value;
   state.selections.forEach(s=>{ s.mountEnabled = on; s.mountWidthMm = w; s.mountColor = c; });
 }
 
-$("addFrameSelect").addEventListener("change", (e)=>{
-  const id = e.target.value;
-  if(!id) return;
-  const frame = state.frames.find(f=>f.id===id);
-  if(!frame) return;
-  if(state.selections.find(s=>s.frame.id===id)){ toast("That frame is already in the carousel."); e.target.value=""; return; }
+$("addStackBtn").addEventListener("click", ()=>{
+  const ids = [$("stackOuterSelect").value, $("stackMiddleSelect").value, $("stackInnerSelect").value].filter(Boolean);
+  if(ids.length === 0){ toast("Pick at least an outer frame."); return; }
+  const frames = ids.map(id => state.frames.find(f=>f.id===id)).filter(Boolean);
   state.selections.push({
-    frame,
+    frames,
     mountEnabled: $("mountToggle").checked,
-    mountWidthMm: parseFloat($("mountWidthInput").value) || 0,
+    mountWidthMm: unitToMmCurrent(parseFloat($("mountWidthInput").value)) || 0,
     mountColor: $("mountColorInput").value
   });
   state.carouselIndex = state.selections.length - 1;
-  e.target.value = "";
+  $("stackOuterSelect").value = ""; $("stackMiddleSelect").value = ""; $("stackInnerSelect").value = "";
   renderFrameChips();
   renderStage();
 });
@@ -811,7 +924,9 @@ function renderFrameChips(){
   state.selections.forEach((s,i)=>{
     const chip = document.createElement("div");
     chip.className = "frameChip";
-    chip.innerHTML = `<img src="${s.frame.corner_image_url}"><span class="fname">${s.frame.name}</span><button data-i="${i}">&times;</button>`;
+    const thumbs = s.frames.map(f=>`<img src="${f.corner_image_url}" alt="">`).join("");
+    const names = s.frames.map(f=>f.name).join(" + ");
+    chip.innerHTML = `<span class="stackThumbs">${thumbs}</span><span class="fname">${names}</span><button data-i="${i}">&times;</button>`;
     chip.querySelector("button").addEventListener("click", ()=>{
       state.selections.splice(i,1);
       if(state.carouselIndex >= state.selections.length) state.carouselIndex = Math.max(0, state.selections.length-1);
@@ -853,9 +968,12 @@ async function renderStage(){
   $("carouselIdx").textContent = `${state.carouselIndex+1} / ${state.selections.length}`;
 
   const sel = state.selections[state.carouselIndex];
-  $("stageFrameName").textContent = sel.frame.name;
-  $("frameCaption").innerHTML = `<b>${sel.frame.width_mm}mm</b> face &middot; <b>${sel.frame.depth_mm}mm</b> rebate` +
-    (sel.mountEnabled ? ` &middot; <b>${sel.mountWidthMm}mm</b> mount` : ` &middot; no mount`);
+  const totalFaceMm = sel.frames.reduce((s,f)=>s+f.width_mm, 0);
+  const depths = sel.frames.map(f=>fmtUnit(f.depth_mm));
+  const depthLabel = depths.length===1 ? `${depths[0]}${state.unit} rebate` : `${Math.min(...depths)}\u2013${Math.max(...depths)}${state.unit} rebate`;
+  $("stageFrameName").textContent = sel.frames.map(f=>f.name).join(" + ");
+  $("frameCaption").innerHTML = `<b>${sel.frames.length}</b> layer${sel.frames.length>1?"s":""} &middot; <b>${fmtUnit(totalFaceMm)}${state.unit}</b> combined face &middot; <b>${depthLabel}</b>` +
+    (sel.mountEnabled ? ` &middot; <b>${fmtUnit(sel.mountWidthMm)}${state.unit}</b> mount` : ` &middot; no mount`);
 
   try{
     await compositeFramePreview(canvas, state.currentArtwork, sel);
@@ -942,42 +1060,96 @@ function drawMitredSide(ctx, pattern, outerPts, innerPts, shadeAdjust){
   ctx.restore();
 }
 
+function drawFrameRing(ctx, outerRect, framePx, textureImg, depthPx){
+  // Draws one mitred frame layer around outerRect and returns the inner
+  // rect it leaves behind — so a stack of up to 3 frames can nest by
+  // feeding each layer's result in as the next layer's outer rect.
+  const { x:ox, y:oy, w:outerW, h:outerH } = outerRect;
+  const ix = ox+framePx, iy = oy+framePx;
+  const innerW = outerW - 2*framePx, innerH = outerH - 2*framePx;
+
+  const OTL = {x:ox, y:oy}, OTR = {x:ox+outerW, y:oy}, OBR = {x:ox+outerW, y:oy+outerH}, OBL = {x:ox, y:oy+outerH};
+  const ITL = {x:ix, y:iy}, ITR = {x:ix+innerW, y:iy}, IBR = {x:ix+innerW, y:iy+innerH}, IBL = {x:ix, y:iy+innerH};
+
+  const hPattern = makeStripPattern(ctx, textureImg, framePx, false);
+  const vPattern = makeStripPattern(ctx, textureImg, framePx, true);
+
+  // 4 mitred trapezoids — slightly different shading top/bottom vs left/right
+  // so each layer reads with a consistent light source, like a real moulding.
+  drawMitredSide(ctx, hPattern, [OTL,OTR], [ITL,ITR], "rgba(255,255,255,0.08)"); // top — lightest
+  drawMitredSide(ctx, vPattern, [OTR,OBR], [ITR,IBR], "rgba(0,0,0,0.10)");        // right
+  drawMitredSide(ctx, hPattern, [OBR,OBL], [IBR,IBL], "rgba(0,0,0,0.22)");        // bottom — darkest
+  drawMitredSide(ctx, vPattern, [OBL,OTL], [IBL,ITL], "rgba(0,0,0,0.05)");        // left
+
+  // Crisp rebate lip line — always present, this is the physical edge where
+  // the face steps down into the rebate.
+  ctx.save();
+  ctx.strokeStyle = "rgba(0,0,0,0.4)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(ix, iy, innerW, innerH);
+  ctx.restore();
+
+  // Soft inset shadow cast by that step, scaled to the frame's real rebate
+  // depth — a deep rebate throws a wider, darker shadow than a shallow one.
+  // (Canvas inset-shadow trick: stroke exactly on the clip boundary with
+  // shadowBlur set — half the blur falls outside the clip and is discarded,
+  // leaving a soft shadow bleeding inward only.)
+  if(depthPx > 0.5){
+    const blur = Math.min(depthPx * 0.9, framePx * 0.9);
+    const alpha = Math.min(0.5, 0.16 + depthPx * 0.012);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(ix, iy, innerW, innerH);
+    ctx.clip();
+    ctx.shadowColor = `rgba(0,0,0,${alpha})`;
+    ctx.shadowBlur = blur;
+    ctx.strokeStyle = `rgba(0,0,0,${alpha})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(ix, iy, innerW, innerH);
+    ctx.restore();
+  }
+
+  return { x:ix, y:iy, w:innerW, h:innerH };
+}
+
 async function compositeFramePreview(canvas, artwork, selection){
-  const [artImg, textureImg] = await Promise.all([
+  const frames = selection.frames; // ordered outer -> inner, 1 to 3 of them
+  const [artImg, ...textureImgs] = await Promise.all([
     cachedImage(artwork.image_url),
-    cachedImage(selection.frame.corner_image_url)
+    ...frames.map(f => cachedImage(f.corner_image_url))
   ]);
 
   // --- scale plan: fit the artwork+mount+frame stack into a max display box,
   // computed from real-world mm so proportions are accurate ---
   const MAX_W = 720, MAX_H = 620;
   const mountMm = selection.mountEnabled ? (selection.mountWidthMm || 0) : 0;
-  const frameMm = selection.frame.width_mm;
+  const framesTotalMm = frames.reduce((s,f) => s + f.width_mm, 0);
 
-  const totalWmm = artwork.width_mm + 2*mountMm + 2*frameMm;
-  const totalHmm = artwork.height_mm + 2*mountMm + 2*frameMm;
+  const totalWmm = artwork.width_mm + 2*mountMm + 2*framesTotalMm;
+  const totalHmm = artwork.height_mm + 2*mountMm + 2*framesTotalMm;
   const scale = Math.min(MAX_W/totalWmm, MAX_H/totalHmm);
 
   const artWpx = artwork.width_mm * scale;
   const artHpx = artwork.height_mm * scale;
   const mountPx = mountMm * scale;
-  const framePx = Math.max(10, frameMm * scale);
+  const framePxList = frames.map(f => Math.max(8, f.width_mm * scale));
+  const depthPxList = frames.map(f => Math.max(0, (f.depth_mm || 0) * scale));
+  const framesTotalPx = framePxList.reduce((s,w) => s+w, 0);
 
   const pad = 26; // room for drop shadow
-  const innerW = artWpx + 2*mountPx;
-  const innerH = artHpx + 2*mountPx;
-  const outerW = innerW + 2*framePx;
-  const outerH = innerH + 2*framePx;
+  const innerW0 = artWpx + 2*mountPx;
+  const innerH0 = artHpx + 2*mountPx;
+  const outerW = innerW0 + 2*framesTotalPx;
+  const outerH = innerH0 + 2*framesTotalPx;
 
   canvas.width = outerW + pad*2;
   canvas.height = outerH + pad*2;
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  const ox = pad, oy = pad; // outer frame top-left
-  const ix = ox + framePx, iy = oy + framePx; // inner opening top-left
+  const ox = pad, oy = pad;
 
-  // drop shadow
+  // drop shadow (once, behind the whole stack)
   ctx.save();
   ctx.shadowColor = "rgba(14,27,51,0.45)";
   ctx.shadowBlur = 22;
@@ -987,26 +1159,12 @@ async function compositeFramePreview(canvas, artwork, selection){
   ctx.fillRect(ox, oy, outerW, outerH);
   ctx.restore();
 
-  // corner coordinates
-  const OTL = {x:ox, y:oy}, OTR = {x:ox+outerW, y:oy}, OBR = {x:ox+outerW, y:oy+outerH}, OBL = {x:ox, y:oy+outerH};
-  const ITL = {x:ix, y:iy}, ITR = {x:ix+innerW, y:iy}, IBR = {x:ix+innerW, y:iy+innerH}, IBL = {x:ix, y:iy+innerH};
-
-  const hPattern = makeStripPattern(ctx, textureImg, framePx, false);
-  const vPattern = makeStripPattern(ctx, textureImg, framePx, true);
-
-  // 4 mitred trapezoids — slightly different shading top/bottom vs left/right
-  // so the frame reads with a consistent light source, like a real moulding.
-  drawMitredSide(ctx, hPattern, [OTL,OTR], [ITL,ITR], "rgba(255,255,255,0.08)"); // top — lightest
-  drawMitredSide(ctx, vPattern, [OTR,OBR], [ITR,IBR], "rgba(0,0,0,0.10)");        // right
-  drawMitredSide(ctx, hPattern, [OBR,OBL], [IBR,IBL], "rgba(0,0,0,0.22)");        // bottom — darkest
-  drawMitredSide(ctx, vPattern, [OBL,OTL], [IBL,ITL], "rgba(0,0,0,0.05)");        // left
-
-  // subtle inner bevel of the frame rebate
-  ctx.save();
-  ctx.strokeStyle = "rgba(0,0,0,0.35)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(ix, iy, innerW, innerH);
-  ctx.restore();
+  // draw each frame layer, outer -> inner, each nesting immediately inside the previous
+  let rect = { x: ox, y: oy, w: outerW, h: outerH };
+  for(let i=0; i<frames.length; i++){
+    rect = drawFrameRing(ctx, rect, framePxList[i], textureImgs[i], depthPxList[i]);
+  }
+  const { x: ix, y: iy, w: innerW, h: innerH } = rect;
 
   // --- mount board ---
   if(mountPx > 0.5){

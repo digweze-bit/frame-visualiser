@@ -9,7 +9,7 @@ frame choices for the same piece.
 Shares the **hourglass-gallery** Supabase project. New tables (prefixed
 `fv_` so they don't collide with the existing HG Cat schema):
 
-- `fv_frames` — moulding library (name, face width mm, rebate depth mm, corner sample photo)
+- `fv_frames` — moulding library (name, face width mm, rebate depth mm, texture photo). Fully editable and deletable from the Frames tab.
 - `fv_artworks` — artwork library (title, size mm, medium, frame/mount requirement)
 - `fv_frame_selections` — (not currently used by the UI, reserved for saving named carousels later)
 
@@ -18,6 +18,15 @@ Storage buckets: `fv-frames`, `fv-artworks` (public read, authenticated write).
 Auth: Supabase email/password, same pattern as the Auction Tracker. Sign up
 from the app itself to create a team login, or add users directly from the
 Supabase dashboard.
+
+## Units
+
+Every measurement is stored in **mm** in Supabase — that never changes. The
+**in / cm toggle** in the top bar only affects what's typed into and shown
+in the forms; it defaults to inches and remembers your last choice (stored
+locally in the browser, per device). Switching units live-converts whatever
+you have currently typed in an open form, so you don't lose in-progress
+values.
 
 ## How the frame preview is built
 
@@ -44,6 +53,20 @@ The app then:
 4. Scales frame width, mount width, and artwork size using the real mm
    values you enter, so proportions stay accurate regardless of on-screen
    size.
+5. Uses the frame's **rebate depth (mm)** to scale the inner shadow cast at
+   the mount/artwork opening — a deep rebate throws a more pronounced step
+   than a shallow one. This is the one field besides width that actually
+   changes the render; **notes is plain reference text** (supplier, price,
+   whatever's useful to you) and isn't read by the app.
+
+## Layered frames
+
+The Visualise tab can build a "look" from up to 3 frames nested one inside
+another (outer / middle / inner) — a common gallery technique. Each frame in
+the stack is rendered as its own true mitred layer at its own face width, so
+proportions stay accurate; the artwork (and mount, if enabled) sits inside
+the innermost one. Each look is one entry in the carousel, so you can flip
+between single frames and layered combinations side by side.
 
 ## Deploy
 
