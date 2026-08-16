@@ -355,8 +355,31 @@
       <div id="frameUploadInner">Click to upload a photo of the moulding<br><span class="mono" style="font-size:11px;">About 4 inches of a straight, flat length is ideal — no corner needed</span></div>
     </div>
 
+    <div class="field"><label>Frame name</label><input type="text" id="frameName" placeholder="e.g. Oslo Oak"></div>
+    <div class="row2">
+      <div class="field"><label>Face width (<span class="unitLabel">in</span>)</label><input type="number" id="frameWidth" class="unitField" min="0" step="any"></div>
+      <div class="field"><label>Rebate depth (<span class="unitLabel">in</span>)</label><input type="number" id="frameDepth" class="unitField" min="0" step="any"></div>
+    </div>
+
+    <div class="field">
+      <label>Frame style</label>
+      <div class="radioRow">
+        <label><input type="radio" name="frameStyle" value="flat" checked> Flat</label>
+        <label><input type="radio" name="frameStyle" value="tray"> Tray / shadow box</label>
+      </div>
+    </div>
+
+    <div id="trayFields" style="display:none;">
+      <p class="cropHint" style="margin-top:0;">A tray frame's inner wall (riser) is a separate, usually vertical surface the artwork sits recessed into — it's rendered as its own band, shaded as a shadowed vertical wall rather than the raking-light face.</p>
+      <div class="field"><label>Riser height (<span class="unitLabel">in</span>)</label><input type="number" id="riserHeight" class="unitField" min="0" step="any"></div>
+      <div class="uploadBox" id="riserUploadBox">
+        <input type="file" id="riserFile" accept="image/*" style="display:none;">
+        <div id="riserUploadInner">Optional: click to upload a separate photo of the riser wall<br><span class="mono" style="font-size:11px;">Leave blank to auto-approximate from the face photo, darkened</span></div>
+      </div>
+    </div>
+
     <div class="cropStage" id="cropStage">
-      <p class="cropHint">Drag the box over a <b>clean, flat</b> section of the moulding — avoid any background, edges, or glare. This patch becomes the tileable texture for the whole frame; 45&deg; mitre corners are rendered automatically.</p>
+      <p class="cropHint" id="cropHint">Drag the box over a <b>clean, flat</b> section of the moulding — avoid any background, edges, or glare. This patch becomes the tileable texture for the whole frame; 45&deg; mitre corners are rendered automatically.</p>
       <div class="cropCanvasWrap" id="cropCanvasWrap">
         <img id="cropImg" alt="">
         <div class="cropBox" id="cropBox">
@@ -370,15 +393,10 @@
       </div>
       <div class="cropResultRow" id="cropResultRow">
         <img id="cropResultImg" alt="">
-        <span class="label">Saved texture patch — tiled along every straight run of the frame.</span>
+        <span class="label" id="cropResultLabel">Saved texture patch — tiled along every straight run of the frame.</span>
       </div>
     </div>
 
-    <div class="field"><label>Frame name</label><input type="text" id="frameName" placeholder="e.g. Oslo Oak"></div>
-    <div class="row2">
-      <div class="field"><label>Face width (<span class="unitLabel">in</span>)</label><input type="number" id="frameWidth" class="unitField" min="0" step="any"></div>
-      <div class="field"><label>Rebate depth (<span class="unitLabel">in</span>)</label><input type="number" id="frameDepth" class="unitField" min="0" step="any"></div>
-    </div>
     <div class="field"><label>Notes</label><input type="text" id="frameNotes" placeholder="Optional"></div>
     <div class="error" id="frameError"></div>
     <div class="closeRow">
@@ -579,8 +597,8 @@ function renderFrameGrid(){
     card.innerHTML = `
       <img class="thumb" src="${f.corner_image_url}" alt="${f.name}">
       <div class="info">
-        <p class="name">${f.name}</p>
-        <p class="meta">${fmtUnit(f.width_mm)}${state.unit} face &middot; ${fmtUnit(f.depth_mm)}${state.unit} rebate</p>
+        <p class="name">${f.name}${f.style === "tray" ? ' <span class="mono" style="font-size:10px;color:var(--orange);">TRAY</span>' : ""}</p>
+        <p class="meta">${fmtUnit(f.width_mm)}${state.unit} face &middot; ${fmtUnit(f.depth_mm)}${state.unit} rebate${f.style === "tray" ? ` &middot; ${fmtUnit(f.riser_height_mm)}${state.unit} riser` : ""}</p>
       </div>
       <div class="cardActions">
         <button class="editBtn" type="button">Edit</button>
@@ -610,24 +628,48 @@ function openFrameModal(frame){
   $("frameWidth").value = frame ? fmtUnit(frame.width_mm) : "";
   $("frameDepth").value = frame ? fmtUnit(frame.depth_mm) : "";
   $("frameNotes").value = frame && frame.notes ? frame.notes : "";
-  $("frameFile").value = ""; $("frameError").textContent = "";
+  $("riserHeight").value = frame && frame.riser_height_mm ? fmtUnit(frame.riser_height_mm) : "";
+  const style = (frame && frame.style === "tray") ? "tray" : "flat";
+  document.querySelector(`input[name="frameStyle"][value="${style}"]`).checked = true;
+  $("trayFields").style.display = style === "tray" ? "block" : "none";
+  $("frameFile").value = ""; $("riserFile").value = ""; $("frameError").textContent = "";
   $("frameModalTitle").textContent = frame ? "Edit frame moulding" : "Add frame moulding";
   $("frameSaveBtn").textContent = frame ? "Save changes" : "Save frame";
   $("frameUploadInner").innerHTML = frame
     ? `<img src="${frame.corner_image_url}" alt=""><div class="mono" style="font-size:11px;margin-top:6px;color:var(--ink-soft);">Current photo — click to replace</div>`
     : `Click to upload a photo of the moulding<br><span class="mono" style="font-size:11px;">About 4 inches of a straight, flat length is ideal — no corner needed</span>`;
+  $("riserUploadInner").innerHTML = frame && frame.riser_image_url
+    ? `<img src="${frame.riser_image_url}" alt=""><div class="mono" style="font-size:11px;margin-top:6px;color:var(--ink-soft);">Current riser photo — click to replace</div>`
+    : `Optional: click to upload a separate photo of the riser wall<br><span class="mono" style="font-size:11px;">Leave blank to auto-approximate from the face photo, darkened</span>`;
   $("cropStage").classList.remove("active");
   $("cropResultRow").classList.remove("active");
   $("cropStatus").textContent = "";
-  crop.blob = null;
+  crop.blobs = { face: null, riser: null };
+  crop.target = "face";
   $("frameModal").classList.add("active");
 }
+document.querySelectorAll('input[name="frameStyle"]').forEach(r=>{
+  r.addEventListener("change", ()=>{
+    $("trayFields").style.display = document.querySelector('input[name="frameStyle"]:checked').value === "tray" ? "block" : "none";
+  });
+});
 $("frameCancelBtn").addEventListener("click", ()=>{ state.editingFrame = null; $("frameModal").classList.remove("active"); });
 $("frameUploadBox").addEventListener("click", ()=> $("frameFile").click());
 $("frameFile").addEventListener("change", ()=>{
   const f = $("frameFile").files[0];
   if(!f) return;
+  crop.target = "face";
+  $("cropHint").innerHTML = `Drag the box over a <b>clean, flat</b> section of the moulding — avoid any background, edges, or glare. This patch becomes the tileable texture for the whole frame; 45&deg; mitre corners are rendered automatically.`;
   $("frameUploadInner").innerHTML = `<img src="${fileToPreviewUrl(f)}" alt="">`;
+  initCropStage(f);
+});
+$("riserUploadBox").addEventListener("click", ()=> $("riserFile").click());
+$("riserFile").addEventListener("change", ()=>{
+  const f = $("riserFile").files[0];
+  if(!f) return;
+  crop.target = "riser";
+  $("cropHint").innerHTML = `Drag the box over a clean patch of the <b>riser wall itself</b> (not the flat rim) — this is what gets shaded as the shadowed vertical surface the artwork sits inside.`;
+  $("riserUploadInner").innerHTML = `<img src="${fileToPreviewUrl(f)}" alt="">`;
   initCropStage(f);
 });
 $("frameSaveBtn").addEventListener("click", async ()=>{
@@ -635,26 +677,37 @@ $("frameSaveBtn").addEventListener("click", async ()=>{
   const width = unitToMmCurrent(parseFloat($("frameWidth").value));
   const depth = unitToMmCurrent(parseFloat($("frameDepth").value));
   const notes = $("frameNotes").value.trim();
+  const style = document.querySelector('input[name="frameStyle"]:checked').value;
   const editing = state.editingFrame;
-  if(!name || !width || !depth || (!editing && !crop.blob)){
+  if(!name || !width || !depth || (!editing && !crop.blobs.face)){
     $("frameError").textContent = "Name, face width, rebate depth, and a texture patch are all required.";
     return;
+  }
+  let riserHeight = null;
+  if(style === "tray"){
+    riserHeight = unitToMmCurrent(parseFloat($("riserHeight").value));
+    if(!riserHeight){
+      $("frameError").textContent = "Riser height is required for a tray / shadow box frame.";
+      return;
+    }
   }
   $("frameSaveBtn").disabled = true;
   try{
     let imageUrl = editing ? editing.corner_image_url : null;
-    if(crop.blob) imageUrl = await uploadImage("fv-frames", crop.blob, "png");
+    if(crop.blobs.face) imageUrl = await uploadImage("fv-frames", crop.blobs.face, "png");
+    let riserImageUrl = (editing && style === "tray") ? (editing.riser_image_url || null) : null;
+    if(style === "tray" && crop.blobs.riser) riserImageUrl = await uploadImage("fv-frames", crop.blobs.riser, "png");
+    const payload = {
+      name, width_mm: width, depth_mm: depth, corner_image_url: imageUrl, notes: notes || null,
+      style, riser_height_mm: style === "tray" ? riserHeight : null,
+      riser_image_url: style === "tray" ? riserImageUrl : null
+    };
     if(editing){
-      const { error } = await sb.from("fv_frames").update({
-        name, width_mm: width, depth_mm: depth, corner_image_url: imageUrl, notes: notes || null
-      }).eq("id", editing.id);
+      const { error } = await sb.from("fv_frames").update(payload).eq("id", editing.id);
       if(error) throw error;
       toast("Frame updated.");
     } else {
-      const { error } = await sb.from("fv_frames").insert({
-        name, width_mm: width, depth_mm: depth, corner_image_url: imageUrl,
-        notes: notes || null, created_by: state.user.id
-      });
+      const { error } = await sb.from("fv_frames").insert({ ...payload, created_by: state.user.id });
       if(error) throw error;
       toast("Frame saved.");
     }
@@ -677,9 +730,12 @@ $("frameSaveBtn").addEventListener("click", async ()=>{
    No perspective/corner math here on purpose: a real mitre has a face, a step
    and a rebate lip at different depths, so a single flat photo of the corner
    can't be warped into a physically correct corner. Instead this just grabs a
-   clean flat patch of the moulding's face to use as a repeating texture — the
-   actual 45° mitre corners are drawn geometrically at render time. */
-const crop = { natW:0, natH:0, dispW:0, dispH:0, scale:1, box:{x:0,y:0,w:0,h:0}, drag:null, blob:null };
+   clean flat patch of the moulding's face (or, for tray frames, the riser
+   wall) to use as a repeating texture — the actual 45° mitre corners are
+   drawn geometrically at render time. crop.target ("face" or "riser") picks
+   which slot the confirmed patch is saved into — the same crop UI is shared
+   by both upload boxes. */
+const crop = { natW:0, natH:0, dispW:0, dispH:0, scale:1, box:{x:0,y:0,w:0,h:0}, drag:null, blobs:{face:null, riser:null}, target:"face" };
 
 function initCropStage(file){
   const url = fileToPreviewUrl(file);
@@ -687,7 +743,7 @@ function initCropStage(file){
   // Show the panel first — measuring clientWidth/Height while display:none returns 0.
   $("cropStage").classList.add("active");
   $("cropResultRow").classList.remove("active");
-  crop.blob = null;
+  crop.blobs[crop.target] = null;
   img.onload = ()=>{
     requestAnimationFrame(()=>{
       crop.natW = img.naturalWidth; crop.natH = img.naturalHeight;
@@ -748,8 +804,11 @@ $("cropConfirmBtn").addEventListener("click", ()=>{
       oc.width = outSize; oc.height = outSize;
       oc.getContext("2d").drawImage($("cropImg"), sx, sy, sSize, sSize, 0, 0, outSize, outSize);
       oc.toBlob(blob=>{
-        crop.blob = blob;
+        crop.blobs[crop.target] = blob;
         $("cropResultImg").src = oc.toDataURL();
+        $("cropResultLabel").textContent = crop.target === "riser"
+          ? "Saved riser texture — used for the shadowed inner wall."
+          : "Saved texture patch — tiled along every straight run of the frame.";
         $("cropResultRow").classList.add("active");
         $("cropStatus").textContent = "Done";
       }, "image/png");
@@ -850,7 +909,7 @@ function renderArtworkSelect(){
   if(cur) sel.value = cur;
 }
 function renderStackSelects(){
-  const opts = state.frames.map(f=>`<option value="${f.id}">${f.name} (${fmtUnit(f.width_mm)}${state.unit})</option>`).join("");
+  const opts = state.frames.map(f=>`<option value="${f.id}">${f.name}${f.style==="tray" ? " (tray)" : ""} (${fmtUnit(f.width_mm)}${state.unit})</option>`).join("");
   const cur = { outer: $("stackOuterSelect").value, middle: $("stackMiddleSelect").value, inner: $("stackInnerSelect").value };
   $("stackOuterSelect").innerHTML = '<option value="">Select outer frame&hellip;</option>' + opts;
   $("stackMiddleSelect").innerHTML = '<option value="">None&hellip;</option>' + opts;
@@ -1060,10 +1119,12 @@ function drawMitredSide(ctx, pattern, outerPts, innerPts, shadeAdjust){
   ctx.restore();
 }
 
-function drawFrameRing(ctx, outerRect, framePx, textureImg, depthPx){
+function drawFrameRing(ctx, outerRect, framePx, textureImg, depthPx, opts){
   // Draws one mitred frame layer around outerRect and returns the inner
-  // rect it leaves behind — so a stack of up to 3 frames can nest by
-  // feeding each layer's result in as the next layer's outer rect.
+  // rect it leaves behind — so a stack of layers (frames, and tray risers
+  // nested inside them) can chain by feeding each result in as the next
+  // layer's outer rect.
+  opts = opts || {};
   const { x:ox, y:oy, w:outerW, h:outerH } = outerRect;
   const ix = ox+framePx, iy = oy+framePx;
   const innerW = outerW - 2*framePx, innerH = outerH - 2*framePx;
@@ -1074,26 +1135,37 @@ function drawFrameRing(ctx, outerRect, framePx, textureImg, depthPx){
   const hPattern = makeStripPattern(ctx, textureImg, framePx, false);
   const vPattern = makeStripPattern(ctx, textureImg, framePx, true);
 
-  // 4 mitred trapezoids — slightly different shading top/bottom vs left/right
-  // so each layer reads with a consistent light source, like a real moulding.
-  drawMitredSide(ctx, hPattern, [OTL,OTR], [ITL,ITR], "rgba(255,255,255,0.08)"); // top — lightest
-  drawMitredSide(ctx, vPattern, [OTR,OBR], [ITR,IBR], "rgba(0,0,0,0.10)");        // right
-  drawMitredSide(ctx, hPattern, [OBR,OBL], [IBR,IBL], "rgba(0,0,0,0.22)");        // bottom — darkest
-  drawMitredSide(ctx, vPattern, [OBL,OTL], [IBL,ITL], "rgba(0,0,0,0.05)");        // left
+  if(opts.uniformShadeAlpha != null){
+    // A vertical wall (tray riser) doesn't catch raking light the way a
+    // flat/angled face does — all 4 sides get the same shadowed tone rather
+    // than a top-lit/bottom-dark gradient.
+    const u = `rgba(0,0,0,${opts.uniformShadeAlpha})`;
+    drawMitredSide(ctx, hPattern, [OTL,OTR], [ITL,ITR], u);
+    drawMitredSide(ctx, vPattern, [OTR,OBR], [ITR,IBR], u);
+    drawMitredSide(ctx, hPattern, [OBR,OBL], [IBR,IBL], u);
+    drawMitredSide(ctx, vPattern, [OBL,OTL], [IBL,ITL], u);
+  } else {
+    // 4 mitred trapezoids — slightly different shading top/bottom vs left/right
+    // so each layer reads with a consistent light source, like a real moulding.
+    drawMitredSide(ctx, hPattern, [OTL,OTR], [ITL,ITR], "rgba(255,255,255,0.08)"); // top — lightest
+    drawMitredSide(ctx, vPattern, [OTR,OBR], [ITR,IBR], "rgba(0,0,0,0.10)");        // right
+    drawMitredSide(ctx, hPattern, [OBR,OBL], [IBR,IBL], "rgba(0,0,0,0.22)");        // bottom — darkest
+    drawMitredSide(ctx, vPattern, [OBL,OTL], [IBL,ITL], "rgba(0,0,0,0.05)");        // left
+  }
 
   // Crisp rebate lip line — always present, this is the physical edge where
-  // the face steps down into the rebate.
+  // the face steps down (to a rebate, or into a tray riser).
   ctx.save();
   ctx.strokeStyle = "rgba(0,0,0,0.4)";
   ctx.lineWidth = 1;
   ctx.strokeRect(ix, iy, innerW, innerH);
   ctx.restore();
 
-  // Soft inset shadow cast by that step, scaled to the frame's real rebate
-  // depth — a deep rebate throws a wider, darker shadow than a shallow one.
-  // (Canvas inset-shadow trick: stroke exactly on the clip boundary with
-  // shadowBlur set — half the blur falls outside the clip and is discarded,
-  // leaving a soft shadow bleeding inward only.)
+  // Soft inset shadow cast by that step, scaled to depth — a deep rebate (or
+  // a tall riser, via the caller) throws a wider, darker shadow than a
+  // shallow one. (Canvas inset-shadow trick: stroke exactly on the clip
+  // boundary with shadowBlur set — half the blur falls outside the clip and
+  // is discarded, leaving a soft shadow bleeding inward only.)
   if(depthPx > 0.5){
     const blur = Math.min(depthPx * 0.9, framePx * 0.9);
     const alpha = Math.min(0.5, 0.16 + depthPx * 0.012);
@@ -1114,16 +1186,23 @@ function drawFrameRing(ctx, outerRect, framePx, textureImg, depthPx){
 
 async function compositeFramePreview(canvas, artwork, selection){
   const frames = selection.frames; // ordered outer -> inner, 1 to 3 of them
-  const [artImg, ...textureImgs] = await Promise.all([
-    cachedImage(artwork.image_url),
-    ...frames.map(f => cachedImage(f.corner_image_url))
-  ]);
+
+  // Resolve every image this stack needs up front: each frame's face texture,
+  // plus a riser texture for any tray frame that has its own separate photo.
+  const urlsToLoad = [artwork.image_url, ...frames.map(f => f.corner_image_url)];
+  const riserUrlIndex = frames.map(f => (f.style === "tray" && f.riser_image_url) ? urlsToLoad.push(f.riser_image_url) - 1 : -1);
+  const loaded = await Promise.all(urlsToLoad.map(cachedImage));
+  const artImg = loaded[0];
+  const faceImgs = frames.map((f,i) => loaded[1+i]);
+  const riserImgs = frames.map((f,i) => riserUrlIndex[i] >= 0 ? loaded[riserUrlIndex[i]] : faceImgs[i]);
 
   // --- scale plan: fit the artwork+mount+frame stack into a max display box,
-  // computed from real-world mm so proportions are accurate ---
+  // computed from real-world mm so proportions are accurate. Tray risers add
+  // to the footprint too, even though they're a separate visual layer. ---
   const MAX_W = 720, MAX_H = 620;
   const mountMm = selection.mountEnabled ? (selection.mountWidthMm || 0) : 0;
-  const framesTotalMm = frames.reduce((s,f) => s + f.width_mm, 0);
+  const frameFootprintMm = f => f.width_mm + (f.style === "tray" ? (f.riser_height_mm || 0) : 0);
+  const framesTotalMm = frames.reduce((s,f) => s + frameFootprintMm(f), 0);
 
   const totalWmm = artwork.width_mm + 2*mountMm + 2*framesTotalMm;
   const totalHmm = artwork.height_mm + 2*mountMm + 2*framesTotalMm;
@@ -1134,7 +1213,8 @@ async function compositeFramePreview(canvas, artwork, selection){
   const mountPx = mountMm * scale;
   const framePxList = frames.map(f => Math.max(8, f.width_mm * scale));
   const depthPxList = frames.map(f => Math.max(0, (f.depth_mm || 0) * scale));
-  const framesTotalPx = framePxList.reduce((s,w) => s+w, 0);
+  const riserPxList = frames.map(f => f.style === "tray" ? Math.max(4, (f.riser_height_mm || 0) * scale) : 0);
+  const framesTotalPx = frames.reduce((s,f,i) => s + framePxList[i] + riserPxList[i], 0);
 
   const pad = 26; // room for drop shadow
   const innerW0 = artWpx + 2*mountPx;
@@ -1159,10 +1239,19 @@ async function compositeFramePreview(canvas, artwork, selection){
   ctx.fillRect(ox, oy, outerW, outerH);
   ctx.restore();
 
-  // draw each frame layer, outer -> inner, each nesting immediately inside the previous
+  // draw each frame layer, outer -> inner, each nesting immediately inside the
+  // previous; a tray frame draws its flat face first, then its riser wall
+  // nested directly inside that, before moving to the next frame in the stack.
   let rect = { x: ox, y: oy, w: outerW, h: outerH };
   for(let i=0; i<frames.length; i++){
-    rect = drawFrameRing(ctx, rect, framePxList[i], textureImgs[i], depthPxList[i]);
+    const f = frames[i];
+    rect = drawFrameRing(ctx, rect, framePxList[i], faceImgs[i], depthPxList[i]);
+    if(f.style === "tray"){
+      const usingRealRiserPhoto = !!f.riser_image_url;
+      rect = drawFrameRing(ctx, rect, riserPxList[i], riserImgs[i], riserPxList[i] * 0.4, {
+        uniformShadeAlpha: usingRealRiserPhoto ? 0.14 : 0.35
+      });
+    }
   }
   const { x: ix, y: iy, w: innerW, h: innerH } = rect;
 

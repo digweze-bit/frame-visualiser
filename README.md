@@ -68,6 +68,26 @@ proportions stay accurate; the artwork (and mount, if enabled) sits inside
 the innermost one. Each look is one entry in the carousel, so you can flip
 between single frames and layered combinations side by side.
 
+## Tray / shadow box frames
+
+A tray frame is geometrically different from a flat moulding: the artwork
+sits recessed into the frame, and there's a second surface — the riser (the
+frame's inner wall) — between the flat outer face and the artwork. Because
+that riser is a separate (usually vertical) surface, it can't be represented
+by tiling the same face texture at an angle; it needs its own treatment.
+
+When adding or editing a frame, choose **Tray / shadow box** as the style
+and enter a **riser height**. The riser renders as its own nested band,
+shaded as a shadowed vertical wall (a flat, uniform shadow tone) rather than
+the raking-light gradient used for the flat face — that gradient simulates
+a surface catching light at an angle, which doesn't apply to a straight
+riser wall.
+
+You can optionally upload a **separate photo of the riser** for a closer
+match — useful since it's genuinely a different surface with its own
+lighting. If you skip it, the app auto-approximates the riser by reusing
+the face texture with a heavier darkening applied.
+
 ## Deploy
 
 Static site, no build step.
