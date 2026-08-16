@@ -150,21 +150,22 @@
     .visLayout{grid-template-columns:1fr;}
   }
 
-  /* ---------- Perspective crop tool ---------- */
+  /* ---------- Rectangle texture-patch crop tool ---------- */
   .cropStage{display:none;margin-bottom:16px;}
   .cropStage.active{display:block;}
   .cropHint{font-size:12px;color:var(--ink-soft);margin:0 0 10px;line-height:1.5;}
   .cropHint b{color:var(--ink);}
   .cropCanvasWrap{position:relative;display:inline-block;background:var(--paper-dim);border:1px solid var(--line);user-select:none;touch-action:none;}
   .cropCanvasWrap img{display:block;max-width:100%;}
-  .cropCanvasWrap svg{position:absolute;top:0;left:0;pointer-events:none;}
-  .cropHandle{
-    position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;
-    background:var(--orange-bright);border:2px solid #fff;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:600;
-    cursor:grab;box-shadow:0 1px 4px rgba(0,0,0,.4);
+  .cropBox{
+    position:absolute;border:2px solid var(--orange-bright);background:rgba(224,92,42,0.16);
+    cursor:move;box-shadow:0 0 0 1000px rgba(14,27,51,0.35);
   }
-  .cropHandle:active{cursor:grabbing;}
+  .cropBoxHandle{
+    position:absolute;right:-9px;bottom:-9px;width:18px;height:18px;
+    background:var(--orange-bright);border:2px solid #fff;border-radius:50%;
+    cursor:nwse-resize;box-shadow:0 1px 4px rgba(0,0,0,.4);
+  }
   .cropActions{display:flex;gap:10px;align-items:center;margin-top:12px;}
   .cropActions .btn.secondary{font-size:12px;padding:8px 14px;}
   .cropResultRow{display:none;align-items:center;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);}
@@ -327,27 +328,25 @@
 
     <div class="uploadBox" id="frameUploadBox">
       <input type="file" id="frameFile" accept="image/*" style="display:none;">
-      <div id="frameUploadInner">Click to upload a photo of a mitred corner sample<br><span class="mono" style="font-size:11px;">Square-on or at an angle — you'll align the 4 points next</span></div>
+      <div id="frameUploadInner">Click to upload a photo of the moulding<br><span class="mono" style="font-size:11px;">About 4 inches of a straight, flat length is ideal — no corner needed</span></div>
     </div>
 
     <div class="cropStage" id="cropStage">
-      <p class="cropHint">Drag point <b>1</b> onto the mitre corner, then <b>2</b>, <b>3</b>, <b>4</b> around the edges of the swatch you want to use — they don't need to form a straight rectangle if the photo's at an angle, the app will straighten it for you.</p>
+      <p class="cropHint">Drag the box over a <b>clean, flat</b> section of the moulding — avoid any background, edges, or glare. This patch becomes the tileable texture for the whole frame; 45&deg; mitre corners are rendered automatically.</p>
       <div class="cropCanvasWrap" id="cropCanvasWrap">
         <img id="cropImg" alt="">
-        <svg id="cropSvg"><polygon id="cropPoly" points="" fill="rgba(224,92,42,0.18)" stroke="#E05C2A" stroke-width="2"></polygon></svg>
-        <div class="cropHandle" id="cropHandle0" data-i="0">1</div>
-        <div class="cropHandle" id="cropHandle1" data-i="1">2</div>
-        <div class="cropHandle" id="cropHandle2" data-i="2">3</div>
-        <div class="cropHandle" id="cropHandle3" data-i="3">4</div>
+        <div class="cropBox" id="cropBox">
+          <div class="cropBoxHandle" id="cropBoxHandle"></div>
+        </div>
       </div>
       <div class="cropActions">
-        <button class="btn secondary" id="cropResetBtn" type="button">Reset points</button>
-        <button class="btn" id="cropConfirmBtn" type="button">Use this crop</button>
+        <button class="btn secondary" id="cropResetBtn" type="button">Reset box</button>
+        <button class="btn" id="cropConfirmBtn" type="button">Use this patch</button>
         <span class="mono" id="cropStatus" style="font-size:11px;color:var(--ink-soft);"></span>
       </div>
       <div class="cropResultRow" id="cropResultRow">
         <img id="cropResultImg" alt="">
-        <span class="label">Straightened corner sample — this is what gets saved &amp; tiled.</span>
+        <span class="label">Saved texture patch — tiled along every straight run of the frame.</span>
       </div>
     </div>
 
@@ -524,11 +523,11 @@ $("addFrameCard").addEventListener("click", ()=> openFrameModal());
 function openFrameModal(){
   $("frameName").value = ""; $("frameWidth").value = ""; $("frameDepth").value = ""; $("frameNotes").value = "";
   $("frameFile").value = ""; $("frameError").textContent = "";
-  $("frameUploadInner").innerHTML = `Click to upload a photo of a mitred corner sample<br><span class="mono" style="font-size:11px;">Square-on or at an angle — you'll align the 4 points next</span>`;
+  $("frameUploadInner").innerHTML = `Click to upload a photo of the moulding<br><span class="mono" style="font-size:11px;">About 4 inches of a straight, flat length is ideal — no corner needed</span>`;
   $("cropStage").classList.remove("active");
   $("cropResultRow").classList.remove("active");
   $("cropStatus").textContent = "";
-  crop.blob = null; crop.previewUrl = null;
+  crop.blob = null;
   $("frameModal").classList.add("active");
 }
 $("frameCancelBtn").addEventListener("click", ()=> $("frameModal").classList.remove("active"));
@@ -545,7 +544,7 @@ $("frameSaveBtn").addEventListener("click", async ()=>{
   const depth = parseFloat($("frameDepth").value);
   const notes = $("frameNotes").value.trim();
   if(!name || !width || !depth || !crop.blob){
-    $("frameError").textContent = "Name, face width, rebate depth, and a straightened corner crop are all required.";
+    $("frameError").textContent = "Name, face width, rebate depth, and a texture patch are all required.";
     return;
   }
   $("frameSaveBtn").disabled = true;
@@ -565,164 +564,91 @@ $("frameSaveBtn").addEventListener("click", async ()=>{
   $("frameSaveBtn").disabled = false;
 });
 
-/* ---- 4-point perspective crop tool ---- */
-const crop = { natW:0, natH:0, dispW:0, dispH:0, scale:1, points:[], dragging:-1, blob:null };
+/* ---- rectangle texture-patch crop tool ----
+   No perspective/corner math here on purpose: a real mitre has a face, a step
+   and a rebate lip at different depths, so a single flat photo of the corner
+   can't be warped into a physically correct corner. Instead this just grabs a
+   clean flat patch of the moulding's face to use as a repeating texture — the
+   actual 45° mitre corners are drawn geometrically at render time. */
+const crop = { natW:0, natH:0, dispW:0, dispH:0, scale:1, box:{x:0,y:0,w:0,h:0}, drag:null, blob:null };
 
 function initCropStage(file){
   const url = fileToPreviewUrl(file);
   const img = $("cropImg");
-  // Show the crop panel first so the image actually has layout dimensions
-  // to measure — reading clientWidth/clientHeight while it's display:none
-  // returns 0, which is what was collapsing all 4 points onto one spot.
+  // Show the panel first — measuring clientWidth/Height while display:none returns 0.
   $("cropStage").classList.add("active");
   $("cropResultRow").classList.remove("active");
   crop.blob = null;
   img.onload = ()=>{
-    // wait a tick so CSS max-width has applied and clientWidth is final
     requestAnimationFrame(()=>{
       crop.natW = img.naturalWidth; crop.natH = img.naturalHeight;
       crop.dispW = img.clientWidth; crop.dispH = img.clientHeight;
       crop.scale = crop.dispW / crop.natW;
-      $("cropSvg").setAttribute("width", crop.dispW);
-      $("cropSvg").setAttribute("height", crop.dispH);
-      $("cropSvg").setAttribute("viewBox", `0 0 ${crop.dispW} ${crop.dispH}`);
-      resetCropPoints();
+      resetCropBox();
     });
   };
   img.src = url;
 }
-function resetCropPoints(){
+function resetCropBox(){
   const w = crop.dispW, h = crop.dispH;
-  // default trapezoid: inset rectangle, point 1 = top-left (the corner to align to the mitre)
-  crop.points = [
-    { x: w*0.18, y: h*0.18 }, // 1 - mitre corner
-    { x: w*0.82, y: h*0.18 }, // 2 - along one arm
-    { x: w*0.82, y: h*0.82 }, // 3 - far inner point
-    { x: w*0.18, y: h*0.82 }  // 4 - along other arm
-  ];
-  renderCropOverlay();
+  const size = Math.min(w, h) * 0.4;
+  crop.box = { x: w/2 - size/2, y: h/2 - size/2, w: size, h: size };
+  renderCropBox();
 }
-$("cropResetBtn").addEventListener("click", resetCropPoints);
-function renderCropOverlay(){
-  crop.points.forEach((p,i)=>{
-    const h = $("cropHandle"+i);
-    h.style.left = p.x+"px";
-    h.style.top = p.y+"px";
-  });
-  const poly = $("cropPoly");
-  poly.setAttribute("points", crop.points.map(p=>`${p.x},${p.y}`).join(" "));
+$("cropResetBtn").addEventListener("click", resetCropBox);
+function renderCropBox(){
+  const el = $("cropBox");
+  el.style.left = crop.box.x + "px";
+  el.style.top = crop.box.y + "px";
+  el.style.width = crop.box.w + "px";
+  el.style.height = crop.box.h + "px";
 }
-[0,1,2,3].forEach(i=>{
-  $("cropHandle"+i).addEventListener("pointerdown", (e)=>{
-    crop.dragging = i;
-    e.target.setPointerCapture(e.pointerId);
-  });
+$("cropBox").addEventListener("pointerdown", (e)=>{
+  if(e.target.id === "cropBoxHandle") return; // handled separately below
+  crop.drag = { mode:"move", startX:e.clientX, startY:e.clientY, orig:{...crop.box} };
+  e.target.setPointerCapture(e.pointerId);
+});
+$("cropBoxHandle").addEventListener("pointerdown", (e)=>{
+  crop.drag = { mode:"resize", startX:e.clientX, startY:e.clientY, orig:{...crop.box} };
+  e.target.setPointerCapture(e.pointerId);
+  e.stopPropagation();
 });
 document.addEventListener("pointermove", (e)=>{
-  if(crop.dragging < 0) return;
-  const wrap = $("cropCanvasWrap");
-  const rect = wrap.getBoundingClientRect();
-  let x = e.clientX - rect.left, y = e.clientY - rect.top;
-  x = Math.max(0, Math.min(crop.dispW, x));
-  y = Math.max(0, Math.min(crop.dispH, y));
-  crop.points[crop.dragging] = { x, y };
-  renderCropOverlay();
+  if(!crop.drag) return;
+  const dx = e.clientX - crop.drag.startX, dy = e.clientY - crop.drag.startY;
+  const o = crop.drag.orig;
+  if(crop.drag.mode === "move"){
+    crop.box.x = Math.max(0, Math.min(crop.dispW - o.w, o.x + dx));
+    crop.box.y = Math.max(0, Math.min(crop.dispH - o.h, o.y + dy));
+  } else {
+    const size = Math.max(24, Math.min(o.w + dx, o.h + dy, crop.dispW - o.x, crop.dispH - o.y));
+    crop.box.w = size; crop.box.h = size;
+  }
+  renderCropBox();
 });
-document.addEventListener("pointerup", ()=>{ crop.dragging = -1; });
+document.addEventListener("pointerup", ()=>{ crop.drag = null; });
 
-/* Solve the projective transform mapping unit-square corners (0,0),(1,0),(1,1),(0,1)
-   to the 4 picked source points, then use it directly as the forward (u,v)->(x,y)
-   sampler when building the output square — this both straightens perspective and
-   canonicalises point 1 to the output's top-left. */
-function solveLinear(A, b){
-  const n = A.length;
-  for(let i=0;i<n;i++){
-    let maxRow = i;
-    for(let k=i+1;k<n;k++) if(Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) maxRow = k;
-    [A[i],A[maxRow]] = [A[maxRow],A[i]]; [b[i],b[maxRow]] = [b[maxRow],b[i]];
-    if(Math.abs(A[i][i]) < 1e-12) continue;
-    for(let k=i+1;k<n;k++){
-      const f = A[k][i]/A[i][i];
-      for(let j=i;j<n;j++) A[k][j] -= f*A[i][j];
-      b[k] -= f*b[i];
-    }
-  }
-  const x = new Array(n).fill(0);
-  for(let i=n-1;i>=0;i--){
-    let sum = b[i];
-    for(let j=i+1;j<n;j++) sum -= A[i][j]*x[j];
-    x[i] = Math.abs(A[i][i])>1e-12 ? sum/A[i][i] : 0;
-  }
-  return x;
-}
-function computePerspectiveCoeffs(srcPts){
-  const uv = [[0,0],[1,0],[1,1],[0,1]];
-  const A = [], b = [];
-  for(let i=0;i<4;i++){
-    const [u,v] = uv[i], {x,y} = srcPts[i];
-    A.push([u,v,1,0,0,0,-u*x,-v*x]); b.push(x);
-    A.push([0,0,0,u,v,1,-u*y,-v*y]); b.push(y);
-  }
-  return solveLinear(A,b); // [a,b,c,d,e,f,g,h]
-}
-function bilinear(data, w, h, x, y){
-  x = Math.max(0, Math.min(w-1.001, x));
-  y = Math.max(0, Math.min(h-1.001, y));
-  const x0 = Math.floor(x), y0 = Math.floor(y), x1 = x0+1, y1 = y0+1;
-  const fx = x-x0, fy = y-y0;
-  const idx = (xx,yy)=> (yy*w+xx)*4;
-  const out = [0,0,0,0];
-  for(let c=0;c<4;c++){
-    const v00 = data[idx(x0,y0)+c], v10 = data[idx(x1,y0)+c];
-    const v01 = data[idx(x0,y1)+c], v11 = data[idx(x1,y1)+c];
-    out[c] = (v00*(1-fx)+v10*fx)*(1-fy) + (v01*(1-fx)+v11*fx)*fy;
-  }
-  return out;
-}
-function warpToSquare(imgEl, dispPoints, outSize){
-  const srcPts = dispPoints.map(p => ({ x: p.x/crop.scale, y: p.y/crop.scale }));
-  const coeffs = computePerspectiveCoeffs(srcPts);
-  const sc = document.createElement("canvas");
-  sc.width = crop.natW; sc.height = crop.natH;
-  sc.getContext("2d").drawImage(imgEl, 0, 0, crop.natW, crop.natH);
-  const srcData = sc.getContext("2d").getImageData(0,0,crop.natW,crop.natH).data;
-
-  const oc = document.createElement("canvas");
-  oc.width = outSize; oc.height = outSize;
-  const octx = oc.getContext("2d");
-  const outImg = octx.createImageData(outSize, outSize);
-  const [a,bb,c,d,e,f,g,h] = coeffs;
-  for(let j=0;j<outSize;j++){
-    const v = j/(outSize-1);
-    for(let i=0;i<outSize;i++){
-      const u = i/(outSize-1);
-      const denom = g*u + h*v + 1;
-      const sx = (a*u + bb*v + c)/denom;
-      const sy = (d*u + e*v + f)/denom;
-      const px = bilinear(srcData, crop.natW, crop.natH, sx, sy);
-      const oi = (j*outSize+i)*4;
-      outImg.data[oi]=px[0]; outImg.data[oi+1]=px[1]; outImg.data[oi+2]=px[2]; outImg.data[oi+3]=255;
-    }
-  }
-  octx.putImageData(outImg, 0, 0);
-  return oc;
-}
 $("cropConfirmBtn").addEventListener("click", ()=>{
-  $("cropStatus").textContent = "Straightening…";
+  $("cropStatus").textContent = "Saving…";
   setTimeout(()=>{
     try{
-      const canvas = warpToSquare($("cropImg"), crop.points, 480);
-      canvas.toBlob(blob=>{
+      const sx = crop.box.x / crop.scale, sy = crop.box.y / crop.scale;
+      const sSize = crop.box.w / crop.scale;
+      const outSize = 480;
+      const oc = document.createElement("canvas");
+      oc.width = outSize; oc.height = outSize;
+      oc.getContext("2d").drawImage($("cropImg"), sx, sy, sSize, sSize, 0, 0, outSize, outSize);
+      oc.toBlob(blob=>{
         crop.blob = blob;
-        $("cropResultImg").src = canvas.toDataURL();
+        $("cropResultImg").src = oc.toDataURL();
         $("cropResultRow").classList.add("active");
         $("cropStatus").textContent = "Done";
       }, "image/png");
     }catch(err){
       console.error(err);
-      $("cropStatus").textContent = "Couldn't straighten that selection — try adjusting the points.";
+      $("cropStatus").textContent = "Couldn't save that patch — try adjusting the box.";
     }
-  }, 20);
+  }, 10);
 });
 
 /* ---------------- artworks tab ---------------- */
@@ -940,12 +866,15 @@ async function renderStage(){
 }
 
 /* ---------------- compositing engine ----------------
-   Builds a to-scale frame preview from a single mitred-corner photo by:
-   - using the corner photo (rotated per corner) as the four corner tiles
-   - cropping a mid-band strip from the corner photo as a repeating texture,
-     tiled along the straight runs between corners
-   Frame / mount widths are scaled against the artwork's real-world size in mm,
-   so relative proportions stay accurate regardless of on-screen size.
+   Frame construction: the corner sample photo only supplies a flat, repeating
+   texture (no literal corner geometry — see the note above the crop tool for
+   why that can't be photographically warped). Each of the 4 frame sides is
+   drawn as its own mitred trapezoid — outer edge at the frame's outer rect,
+   inner edge at the artwork/mount opening, with the two ends cut at a true
+   45° angle — exactly how a real mitred frame is built. The same tiled
+   texture is used for all 4 sides, rotated 90° for the vertical ones.
+   Frame / mount widths are scaled against the artwork's real-world size in
+   mm, so relative proportions stay accurate regardless of on-screen size.
 ------------------------------------------------------- */
 const imgCache = {};
 async function cachedImage(url){
@@ -953,44 +882,68 @@ async function cachedImage(url){
   return imgCache[url];
 }
 
-function makeCornerTile(cornerImg, sizePx, rotationDeg){
-  const c = document.createElement("canvas");
-  c.width = sizePx; c.height = sizePx;
-  const ctx = c.getContext("2d");
-  ctx.save();
-  ctx.translate(sizePx/2, sizePx/2);
-  ctx.rotate(rotationDeg * Math.PI/180);
-  ctx.drawImage(cornerImg, -sizePx/2, -sizePx/2, sizePx, sizePx);
-  ctx.restore();
-  return c;
-}
+function makeStripPattern(ctx, textureImg, thicknessPx, vertical){
+  // Sample a mid-band of the texture patch (avoiding any edge artefacts from
+  // the crop) as a repeating pattern for a frame side.
+  const sw = textureImg.width, sh = textureImg.height;
+  const bandY = sh * 0.30, bandH = sh * 0.4;
+  const bandX = sw * 0.10, bandW = sw * 0.8;
 
-function makeStripPattern(ctx, cornerImg, thicknessPx, vertical){
-  // Sample a mid-band of the corner photo (avoiding the corner point itself)
-  // as a repeating texture for the straight runs of the frame.
-  const sw = cornerImg.width, sh = cornerImg.height;
-  const bandY = sh * 0.38, bandH = sh * 0.24;
-  const bandX = sw * 0.15, bandW = sw * 0.7;
-
-  const tileLen = Math.max(24, Math.round(thicknessPx * 1.4));
+  const tileLen = Math.max(24, Math.round(thicknessPx * 1.6));
   const tc = document.createElement("canvas");
   if(!vertical){
     tc.width = tileLen; tc.height = thicknessPx;
-    tc.getContext("2d").drawImage(cornerImg, bandX, bandY, bandW, bandH, 0, 0, tileLen, thicknessPx);
+    tc.getContext("2d").drawImage(textureImg, bandX, bandY, bandW, bandH, 0, 0, tileLen, thicknessPx);
   } else {
     tc.width = thicknessPx; tc.height = tileLen;
     const t = tc.getContext("2d");
     t.save();
     t.translate(thicknessPx/2, tileLen/2);
     t.rotate(Math.PI/2);
-    t.drawImage(cornerImg, bandX, bandY, bandW, bandH, -tileLen/2, -thicknessPx/2, tileLen, thicknessPx);
+    t.drawImage(textureImg, bandX, bandY, bandW, bandH, -tileLen/2, -thicknessPx/2, tileLen, thicknessPx);
     t.restore();
   }
   return ctx.createPattern(tc, "repeat");
 }
 
+function drawMitredSide(ctx, pattern, outerPts, innerPts, shadeAdjust){
+  // outerPts/innerPts: two {x,y} points each, forming the trapezoid's outer
+  // and inner edges. The 45° mitre cuts are just the straight lines joining
+  // outer[0]->inner[0] and outer[1]->inner[1].
+  ctx.save();
+  const path = new Path2D();
+  path.moveTo(outerPts[0].x, outerPts[0].y);
+  path.lineTo(outerPts[1].x, outerPts[1].y);
+  path.lineTo(innerPts[1].x, innerPts[1].y);
+  path.lineTo(innerPts[0].x, innerPts[0].y);
+  path.closePath();
+  ctx.clip(path);
+  ctx.fillStyle = pattern;
+  const minX = Math.min(outerPts[0].x, outerPts[1].x, innerPts[0].x, innerPts[1].x);
+  const minY = Math.min(outerPts[0].y, outerPts[1].y, innerPts[0].y, innerPts[1].y);
+  const maxX = Math.max(outerPts[0].x, outerPts[1].x, innerPts[0].x, innerPts[1].x);
+  const maxY = Math.max(outerPts[0].y, outerPts[1].y, innerPts[0].y, innerPts[1].y);
+  ctx.fillRect(minX, minY, maxX-minX, maxY-minY);
+  if(shadeAdjust){
+    ctx.fillStyle = shadeAdjust;
+    ctx.fillRect(minX, minY, maxX-minX, maxY-minY);
+  }
+  ctx.restore();
+  // mitre seam line
+  ctx.save();
+  ctx.strokeStyle = "rgba(0,0,0,0.28)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(outerPts[0].x, outerPts[0].y); ctx.lineTo(innerPts[0].x, innerPts[0].y);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(outerPts[1].x, outerPts[1].y); ctx.lineTo(innerPts[1].x, innerPts[1].y);
+  ctx.stroke();
+  ctx.restore();
+}
+
 async function compositeFramePreview(canvas, artwork, selection){
-  const [artImg, cornerImg] = await Promise.all([
+  const [artImg, textureImg] = await Promise.all([
     cachedImage(artwork.image_url),
     cachedImage(selection.frame.corner_image_url)
   ]);
@@ -1022,6 +975,7 @@ async function compositeFramePreview(canvas, artwork, selection){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   const ox = pad, oy = pad; // outer frame top-left
+  const ix = ox + framePx, iy = oy + framePx; // inner opening top-left
 
   // drop shadow
   ctx.save();
@@ -1033,36 +987,22 @@ async function compositeFramePreview(canvas, artwork, selection){
   ctx.fillRect(ox, oy, outerW, outerH);
   ctx.restore();
 
-  // --- frame annulus (outer rect minus inner rect) ---
-  const ix = ox + framePx, iy = oy + framePx;
-  ctx.save();
-  const path = new Path2D();
-  path.rect(ox, oy, outerW, outerH);
-  path.rect(ix, iy, innerW, innerH);
-  ctx.clip(path, "evenodd");
+  // corner coordinates
+  const OTL = {x:ox, y:oy}, OTR = {x:ox+outerW, y:oy}, OBR = {x:ox+outerW, y:oy+outerH}, OBL = {x:ox, y:oy+outerH};
+  const ITL = {x:ix, y:iy}, ITR = {x:ix+innerW, y:iy}, IBR = {x:ix+innerW, y:iy+innerH}, IBL = {x:ix, y:iy+innerH};
 
-  // corner tiles
-  const cornerSize = framePx;
-  const tl = makeCornerTile(cornerImg, cornerSize, 0);
-  const tr = makeCornerTile(cornerImg, cornerSize, 90);
-  const br = makeCornerTile(cornerImg, cornerSize, 180);
-  const bl = makeCornerTile(cornerImg, cornerSize, 270);
-  ctx.drawImage(tl, ox, oy, cornerSize, cornerSize);
-  ctx.drawImage(tr, ox+outerW-cornerSize, oy, cornerSize, cornerSize);
-  ctx.drawImage(br, ox+outerW-cornerSize, oy+outerH-cornerSize, cornerSize, cornerSize);
-  ctx.drawImage(bl, ox, oy+outerH-cornerSize, cornerSize, cornerSize);
+  const hPattern = makeStripPattern(ctx, textureImg, framePx, false);
+  const vPattern = makeStripPattern(ctx, textureImg, framePx, true);
 
-  // straight runs, tiled
-  const hPattern = makeStripPattern(ctx, cornerImg, framePx, false);
-  const vPattern = makeStripPattern(ctx, cornerImg, framePx, true);
-  ctx.fillStyle = hPattern;
-  ctx.save(); ctx.translate(ox+cornerSize, oy); ctx.fillRect(0,0, outerW-2*cornerSize, framePx); ctx.restore();
-  ctx.save(); ctx.translate(ox+cornerSize, oy+outerH-framePx); ctx.fillRect(0,0, outerW-2*cornerSize, framePx); ctx.restore();
-  ctx.fillStyle = vPattern;
-  ctx.save(); ctx.translate(ox, oy+cornerSize); ctx.fillRect(0,0, framePx, outerH-2*cornerSize); ctx.restore();
-  ctx.save(); ctx.translate(ox+outerW-framePx, oy+cornerSize); ctx.fillRect(0,0, framePx, outerH-2*cornerSize); ctx.restore();
+  // 4 mitred trapezoids — slightly different shading top/bottom vs left/right
+  // so the frame reads with a consistent light source, like a real moulding.
+  drawMitredSide(ctx, hPattern, [OTL,OTR], [ITL,ITR], "rgba(255,255,255,0.08)"); // top — lightest
+  drawMitredSide(ctx, vPattern, [OTR,OBR], [ITR,IBR], "rgba(0,0,0,0.10)");        // right
+  drawMitredSide(ctx, hPattern, [OBR,OBL], [IBR,IBL], "rgba(0,0,0,0.22)");        // bottom — darkest
+  drawMitredSide(ctx, vPattern, [OBL,OTL], [IBL,ITL], "rgba(0,0,0,0.05)");        // left
 
   // subtle inner bevel of the frame rebate
+  ctx.save();
   ctx.strokeStyle = "rgba(0,0,0,0.35)";
   ctx.lineWidth = 2;
   ctx.strokeRect(ix, iy, innerW, innerH);

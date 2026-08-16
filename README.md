@@ -22,18 +22,28 @@ Supabase dashboard.
 ## How the frame preview is built
 
 There's no true 3D render — instead, for each frame you upload one photo of
-a **mitred corner sample**, shot square-on with the corner at the top-left
-of the frame and the two arms running right and down. The app:
+the moulding and select a clean flat patch from it as a repeating texture.
 
-1. Uses that corner photo (rotated 0/90/180/270°) as the four corner tiles.
-2. Crops a mid-band strip from the photo as a repeating texture, tiled along
-   the straight runs between corners.
-3. Scales the frame width, mount width and artwork size using the real mm
-   measurements you enter, so relative proportions are accurate regardless
-   of on-screen size.
+**Best source: about 4 inches of a straight, flat length of the moulding**,
+shot square-on, laid flat, evenly lit — no corner needed. A corner sample
+also works (just crop a flat section away from the corner itself), but a
+straight length is simpler to shoot consistently since there's no depth or
+perspective to worry about.
 
-For best results: even, diffuse lighting, plain background, corner filling
-most of the frame, minimal glare.
+The app then:
+
+1. Lets you drag a crop box over a clean patch of that photo (avoiding
+   background, edges, glare).
+2. Tiles that patch as a repeating texture along all 4 sides of the frame,
+   scaled to the frame's real face width in mm.
+3. Renders the 4 corners **geometrically** as true 45° mitre cuts — the same
+   way a real frame is built — rather than trying to reuse a photographed
+   corner, which can't be warped into 4 different orientations without
+   distortion (a mitre has a face, a step, and a rebate lip at different
+   depths, so a flat photo of one corner can't stand in for all four).
+4. Scales frame width, mount width, and artwork size using the real mm
+   values you enter, so proportions stay accurate regardless of on-screen
+   size.
 
 ## Deploy
 
