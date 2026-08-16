@@ -571,6 +571,12 @@ const crop = { natW:0, natH:0, dispW:0, dispH:0, scale:1, points:[], dragging:-1
 function initCropStage(file){
   const url = fileToPreviewUrl(file);
   const img = $("cropImg");
+  // Show the crop panel first so the image actually has layout dimensions
+  // to measure — reading clientWidth/clientHeight while it's display:none
+  // returns 0, which is what was collapsing all 4 points onto one spot.
+  $("cropStage").classList.add("active");
+  $("cropResultRow").classList.remove("active");
+  crop.blob = null;
   img.onload = ()=>{
     // wait a tick so CSS max-width has applied and clientWidth is final
     requestAnimationFrame(()=>{
@@ -581,9 +587,6 @@ function initCropStage(file){
       $("cropSvg").setAttribute("height", crop.dispH);
       $("cropSvg").setAttribute("viewBox", `0 0 ${crop.dispW} ${crop.dispH}`);
       resetCropPoints();
-      $("cropStage").classList.add("active");
-      $("cropResultRow").classList.remove("active");
-      crop.blob = null;
     });
   };
   img.src = url;
