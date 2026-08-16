@@ -149,6 +149,28 @@
   @media (max-width:820px){
     .visLayout{grid-template-columns:1fr;}
   }
+
+  /* ---------- Perspective crop tool ---------- */
+  .cropStage{display:none;margin-bottom:16px;}
+  .cropStage.active{display:block;}
+  .cropHint{font-size:12px;color:var(--ink-soft);margin:0 0 10px;line-height:1.5;}
+  .cropHint b{color:var(--ink);}
+  .cropCanvasWrap{position:relative;display:inline-block;background:var(--paper-dim);border:1px solid var(--line);user-select:none;touch-action:none;}
+  .cropCanvasWrap img{display:block;max-width:100%;}
+  .cropCanvasWrap svg{position:absolute;top:0;left:0;pointer-events:none;}
+  .cropHandle{
+    position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;
+    background:var(--orange-bright);border:2px solid #fff;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:600;
+    cursor:grab;box-shadow:0 1px 4px rgba(0,0,0,.4);
+  }
+  .cropHandle:active{cursor:grabbing;}
+  .cropActions{display:flex;gap:10px;align-items:center;margin-top:12px;}
+  .cropActions .btn.secondary{font-size:12px;padding:8px 14px;}
+  .cropResultRow{display:none;align-items:center;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line);}
+  .cropResultRow.active{display:flex;}
+  .cropResultRow img{width:84px;height:84px;object-fit:cover;border:1px solid var(--line);}
+  .cropResultRow .label{font-size:12px;color:var(--ink-soft);}
 </style>
 </head>
 <body>
@@ -302,10 +324,33 @@
 <div class="overlay" id="frameModal">
   <div class="panel">
     <h3>Add frame moulding</h3>
+
     <div class="uploadBox" id="frameUploadBox">
       <input type="file" id="frameFile" accept="image/*" style="display:none;">
-      <div id="frameUploadInner">Click to upload a photo of a mitred corner sample<br><span class="mono" style="font-size:11px;">Shoot it square-on, corner at top-left, arms running right &amp; down, even lighting, plain background</span></div>
+      <div id="frameUploadInner">Click to upload a photo of a mitred corner sample<br><span class="mono" style="font-size:11px;">Square-on or at an angle — you'll align the 4 points next</span></div>
     </div>
+
+    <div class="cropStage" id="cropStage">
+      <p class="cropHint">Drag point <b>1</b> onto the mitre corner, then <b>2</b>, <b>3</b>, <b>4</b> around the edges of the swatch you want to use — they don't need to form a straight rectangle if the photo's at an angle, the app will straighten it for you.</p>
+      <div class="cropCanvasWrap" id="cropCanvasWrap">
+        <img id="cropImg" alt="">
+        <svg id="cropSvg"><polygon id="cropPoly" points="" fill="rgba(224,92,42,0.18)" stroke="#E05C2A" stroke-width="2"></polygon></svg>
+        <div class="cropHandle" id="cropHandle0" data-i="0">1</div>
+        <div class="cropHandle" id="cropHandle1" data-i="1">2</div>
+        <div class="cropHandle" id="cropHandle2" data-i="2">3</div>
+        <div class="cropHandle" id="cropHandle3" data-i="3">4</div>
+      </div>
+      <div class="cropActions">
+        <button class="btn secondary" id="cropResetBtn" type="button">Reset points</button>
+        <button class="btn" id="cropConfirmBtn" type="button">Use this crop</button>
+        <span class="mono" id="cropStatus" style="font-size:11px;color:var(--ink-soft);"></span>
+      </div>
+      <div class="cropResultRow" id="cropResultRow">
+        <img id="cropResultImg" alt="">
+        <span class="label">Straightened corner sample — this is what gets saved &amp; tiled.</span>
+      </div>
+    </div>
+
     <div class="field"><label>Frame name</label><input type="text" id="frameName" placeholder="e.g. Oslo Oak 32mm"></div>
     <div class="row2">
       <div class="field"><label>Face width (mm)</label><input type="number" id="frameWidth" min="1"></div>
@@ -363,10 +408,10 @@ function loadImage(src){
 }
 function fileToPreviewUrl(file){ return URL.createObjectURL(file); }
 
-async function uploadImage(bucket, file){
-  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+async function uploadImage(bucket, file, extOverride){
+  const ext = extOverride || (file.name ? (file.name.split(".").pop() || "jpg").toLowerCase() : "jpg");
   const path = `${state.user.id}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
-  const { error } = await sb.storage.from(bucket).upload(path, file, { upsert:false });
+  const { error } = await sb.storage.from(bucket).upload(path, file, { upsert:false, contentType: file.type || "image/png" });
   if(error) throw error;
   const { data } = sb.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
@@ -479,7 +524,11 @@ $("addFrameCard").addEventListener("click", ()=> openFrameModal());
 function openFrameModal(){
   $("frameName").value = ""; $("frameWidth").value = ""; $("frameDepth").value = ""; $("frameNotes").value = "";
   $("frameFile").value = ""; $("frameError").textContent = "";
-  $("frameUploadInner").innerHTML = `Click to upload a photo of a mitred corner sample<br><span class="mono" style="font-size:11px;">Shoot it square-on, corner at top-left, arms running right &amp; down, even lighting, plain background</span>`;
+  $("frameUploadInner").innerHTML = `Click to upload a photo of a mitred corner sample<br><span class="mono" style="font-size:11px;">Square-on or at an angle — you'll align the 4 points next</span>`;
+  $("cropStage").classList.remove("active");
+  $("cropResultRow").classList.remove("active");
+  $("cropStatus").textContent = "";
+  crop.blob = null; crop.previewUrl = null;
   $("frameModal").classList.add("active");
 }
 $("frameCancelBtn").addEventListener("click", ()=> $("frameModal").classList.remove("active"));
@@ -488,20 +537,20 @@ $("frameFile").addEventListener("change", ()=>{
   const f = $("frameFile").files[0];
   if(!f) return;
   $("frameUploadInner").innerHTML = `<img src="${fileToPreviewUrl(f)}" alt="">`;
+  initCropStage(f);
 });
 $("frameSaveBtn").addEventListener("click", async ()=>{
   const name = $("frameName").value.trim();
   const width = parseFloat($("frameWidth").value);
   const depth = parseFloat($("frameDepth").value);
   const notes = $("frameNotes").value.trim();
-  const file = $("frameFile").files[0];
-  if(!name || !width || !depth || !file){
-    $("frameError").textContent = "Name, face width, rebate depth and a corner photo are all required.";
+  if(!name || !width || !depth || !crop.blob){
+    $("frameError").textContent = "Name, face width, rebate depth, and a straightened corner crop are all required.";
     return;
   }
   $("frameSaveBtn").disabled = true;
   try{
-    const url = await uploadImage("fv-frames", file);
+    const url = await uploadImage("fv-frames", crop.blob, "png");
     const { error } = await sb.from("fv_frames").insert({
       name, width_mm: width, depth_mm: depth, corner_image_url: url,
       notes: notes || null, created_by: state.user.id
@@ -514,6 +563,163 @@ $("frameSaveBtn").addEventListener("click", async ()=>{
     $("frameError").textContent = err.message || "Couldn't save the frame.";
   }
   $("frameSaveBtn").disabled = false;
+});
+
+/* ---- 4-point perspective crop tool ---- */
+const crop = { natW:0, natH:0, dispW:0, dispH:0, scale:1, points:[], dragging:-1, blob:null };
+
+function initCropStage(file){
+  const url = fileToPreviewUrl(file);
+  const img = $("cropImg");
+  img.onload = ()=>{
+    // wait a tick so CSS max-width has applied and clientWidth is final
+    requestAnimationFrame(()=>{
+      crop.natW = img.naturalWidth; crop.natH = img.naturalHeight;
+      crop.dispW = img.clientWidth; crop.dispH = img.clientHeight;
+      crop.scale = crop.dispW / crop.natW;
+      $("cropSvg").setAttribute("width", crop.dispW);
+      $("cropSvg").setAttribute("height", crop.dispH);
+      $("cropSvg").setAttribute("viewBox", `0 0 ${crop.dispW} ${crop.dispH}`);
+      resetCropPoints();
+      $("cropStage").classList.add("active");
+      $("cropResultRow").classList.remove("active");
+      crop.blob = null;
+    });
+  };
+  img.src = url;
+}
+function resetCropPoints(){
+  const w = crop.dispW, h = crop.dispH;
+  // default trapezoid: inset rectangle, point 1 = top-left (the corner to align to the mitre)
+  crop.points = [
+    { x: w*0.18, y: h*0.18 }, // 1 - mitre corner
+    { x: w*0.82, y: h*0.18 }, // 2 - along one arm
+    { x: w*0.82, y: h*0.82 }, // 3 - far inner point
+    { x: w*0.18, y: h*0.82 }  // 4 - along other arm
+  ];
+  renderCropOverlay();
+}
+$("cropResetBtn").addEventListener("click", resetCropPoints);
+function renderCropOverlay(){
+  crop.points.forEach((p,i)=>{
+    const h = $("cropHandle"+i);
+    h.style.left = p.x+"px";
+    h.style.top = p.y+"px";
+  });
+  const poly = $("cropPoly");
+  poly.setAttribute("points", crop.points.map(p=>`${p.x},${p.y}`).join(" "));
+}
+[0,1,2,3].forEach(i=>{
+  $("cropHandle"+i).addEventListener("pointerdown", (e)=>{
+    crop.dragging = i;
+    e.target.setPointerCapture(e.pointerId);
+  });
+});
+document.addEventListener("pointermove", (e)=>{
+  if(crop.dragging < 0) return;
+  const wrap = $("cropCanvasWrap");
+  const rect = wrap.getBoundingClientRect();
+  let x = e.clientX - rect.left, y = e.clientY - rect.top;
+  x = Math.max(0, Math.min(crop.dispW, x));
+  y = Math.max(0, Math.min(crop.dispH, y));
+  crop.points[crop.dragging] = { x, y };
+  renderCropOverlay();
+});
+document.addEventListener("pointerup", ()=>{ crop.dragging = -1; });
+
+/* Solve the projective transform mapping unit-square corners (0,0),(1,0),(1,1),(0,1)
+   to the 4 picked source points, then use it directly as the forward (u,v)->(x,y)
+   sampler when building the output square — this both straightens perspective and
+   canonicalises point 1 to the output's top-left. */
+function solveLinear(A, b){
+  const n = A.length;
+  for(let i=0;i<n;i++){
+    let maxRow = i;
+    for(let k=i+1;k<n;k++) if(Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) maxRow = k;
+    [A[i],A[maxRow]] = [A[maxRow],A[i]]; [b[i],b[maxRow]] = [b[maxRow],b[i]];
+    if(Math.abs(A[i][i]) < 1e-12) continue;
+    for(let k=i+1;k<n;k++){
+      const f = A[k][i]/A[i][i];
+      for(let j=i;j<n;j++) A[k][j] -= f*A[i][j];
+      b[k] -= f*b[i];
+    }
+  }
+  const x = new Array(n).fill(0);
+  for(let i=n-1;i>=0;i--){
+    let sum = b[i];
+    for(let j=i+1;j<n;j++) sum -= A[i][j]*x[j];
+    x[i] = Math.abs(A[i][i])>1e-12 ? sum/A[i][i] : 0;
+  }
+  return x;
+}
+function computePerspectiveCoeffs(srcPts){
+  const uv = [[0,0],[1,0],[1,1],[0,1]];
+  const A = [], b = [];
+  for(let i=0;i<4;i++){
+    const [u,v] = uv[i], {x,y} = srcPts[i];
+    A.push([u,v,1,0,0,0,-u*x,-v*x]); b.push(x);
+    A.push([0,0,0,u,v,1,-u*y,-v*y]); b.push(y);
+  }
+  return solveLinear(A,b); // [a,b,c,d,e,f,g,h]
+}
+function bilinear(data, w, h, x, y){
+  x = Math.max(0, Math.min(w-1.001, x));
+  y = Math.max(0, Math.min(h-1.001, y));
+  const x0 = Math.floor(x), y0 = Math.floor(y), x1 = x0+1, y1 = y0+1;
+  const fx = x-x0, fy = y-y0;
+  const idx = (xx,yy)=> (yy*w+xx)*4;
+  const out = [0,0,0,0];
+  for(let c=0;c<4;c++){
+    const v00 = data[idx(x0,y0)+c], v10 = data[idx(x1,y0)+c];
+    const v01 = data[idx(x0,y1)+c], v11 = data[idx(x1,y1)+c];
+    out[c] = (v00*(1-fx)+v10*fx)*(1-fy) + (v01*(1-fx)+v11*fx)*fy;
+  }
+  return out;
+}
+function warpToSquare(imgEl, dispPoints, outSize){
+  const srcPts = dispPoints.map(p => ({ x: p.x/crop.scale, y: p.y/crop.scale }));
+  const coeffs = computePerspectiveCoeffs(srcPts);
+  const sc = document.createElement("canvas");
+  sc.width = crop.natW; sc.height = crop.natH;
+  sc.getContext("2d").drawImage(imgEl, 0, 0, crop.natW, crop.natH);
+  const srcData = sc.getContext("2d").getImageData(0,0,crop.natW,crop.natH).data;
+
+  const oc = document.createElement("canvas");
+  oc.width = outSize; oc.height = outSize;
+  const octx = oc.getContext("2d");
+  const outImg = octx.createImageData(outSize, outSize);
+  const [a,bb,c,d,e,f,g,h] = coeffs;
+  for(let j=0;j<outSize;j++){
+    const v = j/(outSize-1);
+    for(let i=0;i<outSize;i++){
+      const u = i/(outSize-1);
+      const denom = g*u + h*v + 1;
+      const sx = (a*u + bb*v + c)/denom;
+      const sy = (d*u + e*v + f)/denom;
+      const px = bilinear(srcData, crop.natW, crop.natH, sx, sy);
+      const oi = (j*outSize+i)*4;
+      outImg.data[oi]=px[0]; outImg.data[oi+1]=px[1]; outImg.data[oi+2]=px[2]; outImg.data[oi+3]=255;
+    }
+  }
+  octx.putImageData(outImg, 0, 0);
+  return oc;
+}
+$("cropConfirmBtn").addEventListener("click", ()=>{
+  $("cropStatus").textContent = "Straightening…";
+  setTimeout(()=>{
+    try{
+      const canvas = warpToSquare($("cropImg"), crop.points, 480);
+      canvas.toBlob(blob=>{
+        crop.blob = blob;
+        $("cropResultImg").src = canvas.toDataURL();
+        $("cropResultRow").classList.add("active");
+        $("cropStatus").textContent = "Done";
+      }, "image/png");
+    }catch(err){
+      console.error(err);
+      $("cropStatus").textContent = "Couldn't straighten that selection — try adjusting the points.";
+    }
+  }, 20);
 });
 
 /* ---------------- artworks tab ---------------- */
