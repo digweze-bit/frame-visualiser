@@ -186,6 +186,10 @@
   .cropResultRow.active{display:flex;}
   .cropResultRow img{width:84px;height:84px;object-fit:cover;border:1px solid var(--line);}
   .cropResultRow .label{font-size:12px;color:var(--ink-soft);}
+
+  /* ---------- Camera capture ---------- */
+  .cameraStage{background:var(--paper-dim);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;min-height:240px;}
+  .cameraStage video, .cameraStage img{width:100%;max-height:60vh;display:block;object-fit:contain;background:#000;}
 </style>
 </head>
 <body>
@@ -320,6 +324,7 @@
       <input type="file" id="artworkFile" accept="image/*" style="display:none;">
       <div id="artworkUploadInner">Click to upload artwork photo</div>
     </div>
+    <button class="btn secondary block" id="artworkCameraBtn" type="button" style="margin-top:8px;">Take photo with camera</button>
     <div class="field"><label>Title</label><input type="text" id="artworkTitle" placeholder="e.g. Untitled (Lagos Market)"></div>
     <div class="row2">
       <div class="field"><label>Width (<span class="unitLabel">in</span>)</label><input type="number" id="artworkWidth" class="unitField" min="0" step="any"></div>
@@ -341,6 +346,25 @@
     <div class="closeRow">
       <button class="btn secondary" id="artworkCancelBtn">Cancel</button>
       <button class="btn" id="artworkSaveBtn">Save artwork</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= CAMERA CAPTURE MODAL ================= -->
+<div class="overlay" id="cameraModal">
+  <div class="panel">
+    <h3>Take photo</h3>
+    <div class="cameraStage" id="cameraStage">
+      <video id="cameraVideo" autoplay playsinline muted></video>
+      <canvas id="cameraCanvas" style="display:none;"></canvas>
+      <img id="cameraPreviewImg" alt="" style="display:none;">
+    </div>
+    <div class="error" id="cameraError"></div>
+    <div class="cropActions" style="margin-top:14px;">
+      <button class="btn secondary" id="cameraCancelBtn" type="button">Cancel</button>
+      <button class="btn" id="cameraCaptureBtn" type="button">Capture</button>
+      <button class="btn secondary" id="cameraRetakeBtn" type="button" style="display:none;">Retake</button>
+      <button class="btn" id="cameraUseBtn" type="button" style="display:none;">Use this photo</button>
     </div>
   </div>
 </div>
@@ -845,9 +869,11 @@ function renderArtworkGrid(){
   });
 }
 $("addArtworkCard").addEventListener("click", ()=> openArtworkModal());
+let pendingArtworkImage = null; // File from upload, or Blob from camera capture
 function openArtworkModal(){
   ["artworkTitle","artworkWidth","artworkHeight","artworkMedium"].forEach(id=>$(id).value="");
   $("artworkFile").value = "";
+  pendingArtworkImage = null;
   $("artworkMountWidth").value = fmtUnit(70);
   $("artworkMountColor").value = "#F5F1E8";
   document.querySelector('input[name="req"][value="frame_only"]').checked = true;
@@ -861,6 +887,7 @@ $("artworkUploadBox").addEventListener("click", ()=> $("artworkFile").click());
 $("artworkFile").addEventListener("change", ()=>{
   const f = $("artworkFile").files[0];
   if(!f) return;
+  pendingArtworkImage = f;
   $("artworkUploadInner").innerHTML = `<img src="${fileToPreviewUrl(f)}" alt="">`;
 });
 document.querySelectorAll('input[name="req"]').forEach(r=>{
@@ -877,14 +904,13 @@ $("artworkSaveBtn").addEventListener("click", async ()=>{
   const mountWidthRaw = parseFloat($("artworkMountWidth").value);
   const mountWidth = isNaN(mountWidthRaw) ? null : unitToMmCurrent(mountWidthRaw);
   const mountColor = $("artworkMountColor").value;
-  const file = $("artworkFile").files[0];
-  if(!title || !width || !height || !file){
-    $("artworkError").textContent = "Title, width, height and an artwork photo are all required.";
+  if(!title || !width || !height || !pendingArtworkImage){
+    $("artworkError").textContent = "Title, width, height and an artwork photo (upload or camera) are all required.";
     return;
   }
   $("artworkSaveBtn").disabled = true;
   try{
-    const url = await uploadImage("fv-artworks", file);
+    const url = await uploadImage("fv-artworks", pendingArtworkImage, pendingArtworkImage.name ? undefined : "jpg");
     const { error } = await sb.from("fv_artworks").insert({
       title, width_mm: width, height_mm: height, medium: medium || null,
       requirement, mount_width_mm: requirement==="frame_and_mount" ? mountWidth : null,
@@ -898,6 +924,68 @@ $("artworkSaveBtn").addEventListener("click", async ()=>{
     $("artworkError").textContent = err.message || "Couldn't save the artwork.";
   }
   $("artworkSaveBtn").disabled = false;
+});
+
+/* ---- camera capture ---- */
+let cameraStream = null;
+function stopCameraStream(){
+  if(cameraStream){ cameraStream.getTracks().forEach(t=>t.stop()); cameraStream = null; }
+}
+async function openCameraModal(){
+  $("cameraError").textContent = "";
+  $("cameraVideo").style.display = "block";
+  $("cameraPreviewImg").style.display = "none";
+  $("cameraCaptureBtn").style.display = "inline-block";
+  $("cameraRetakeBtn").style.display = "none";
+  $("cameraUseBtn").style.display = "none";
+  $("cameraModal").classList.add("active");
+  try{
+    // Prefer the rear camera, since artworks are being photographed rather
+    // than the photographer — fall back to whatever camera is available.
+    let stream;
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } });
+    }catch(e){
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    }
+    cameraStream = stream;
+    $("cameraVideo").srcObject = stream;
+  }catch(err){
+    $("cameraError").textContent = "Couldn't access the camera — check your browser's camera permission for this site, or use upload instead.";
+  }
+}
+function closeCameraModal(){
+  stopCameraStream();
+  $("cameraModal").classList.remove("active");
+}
+$("artworkCameraBtn").addEventListener("click", openCameraModal);
+$("cameraCancelBtn").addEventListener("click", closeCameraModal);
+$("cameraCaptureBtn").addEventListener("click", ()=>{
+  const video = $("cameraVideo");
+  const canvas = $("cameraCanvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+  $("cameraPreviewImg").src = canvas.toDataURL("image/jpeg", 0.92);
+  $("cameraVideo").style.display = "none";
+  $("cameraPreviewImg").style.display = "block";
+  $("cameraCaptureBtn").style.display = "none";
+  $("cameraRetakeBtn").style.display = "inline-block";
+  $("cameraUseBtn").style.display = "inline-block";
+});
+$("cameraRetakeBtn").addEventListener("click", ()=>{
+  $("cameraVideo").style.display = "block";
+  $("cameraPreviewImg").style.display = "none";
+  $("cameraCaptureBtn").style.display = "inline-block";
+  $("cameraRetakeBtn").style.display = "none";
+  $("cameraUseBtn").style.display = "none";
+});
+$("cameraUseBtn").addEventListener("click", ()=>{
+  $("cameraCanvas").toBlob(blob=>{
+    pendingArtworkImage = blob;
+    $("artworkUploadInner").innerHTML = `<img src="${$("cameraPreviewImg").src}" alt="">`;
+    closeCameraModal();
+  }, "image/jpeg", 0.92);
 });
 
 /* ---------------- visualiser ---------------- */

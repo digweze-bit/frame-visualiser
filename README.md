@@ -19,6 +19,14 @@ Auth: Supabase email/password, same pattern as the Auction Tracker. Sign up
 from the app itself to create a team login, or add users directly from the
 Supabase dashboard.
 
+## Camera capture
+
+When adding an artwork, "Take photo with camera" opens a live camera view
+(rear camera preferred, on devices that have one) instead of requiring an
+existing file — capture, retake if needed, then use the shot directly.
+Requires the browser's camera permission for the site, and only works over
+HTTPS (which the deployed Vercel URL already is).
+
 ## Units
 
 Every measurement is stored in **mm** in Supabase — that never changes. The
