@@ -27,6 +27,21 @@ existing file — capture, retake if needed, then use the shot directly.
 Requires the browser's camera permission for the site, and only works over
 HTTPS (which the deployed Vercel URL already is).
 
+## Background & sharing
+
+In the Visualise tab, an **Export / share background** toggle (Transparent
+or White) controls how the preview canvas itself is rendered — this is the
+same canvas that gets shared, so what you pick is exactly what a customer
+receives. Transparent is a true alpha PNG; White flattens onto solid white,
+closer to a product shot.
+
+**Share preview** generates the current carousel frame as a PNG and, where
+the browser supports it (most mobile browsers), opens the native share
+sheet — the same one that offers WhatsApp, Mail, Messages, and anything
+else installed on the device. On browsers without file-sharing support
+(mainly some desktop browsers), it falls back to a plain download so the
+image can be attached manually.
+
 ## Units
 
 Every measurement is stored in **mm** in Supabase — that never changes. The

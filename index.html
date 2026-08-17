@@ -45,6 +45,10 @@
   .unitToggleBtn{background:transparent;border:none;color:#9FB0CC;padding:6px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
   .unitToggleBtn.active{background:var(--orange-bright);color:#fff;}
   .unitToggleBtn:not(.active):hover{color:#fff;}
+  .bgToggle{display:flex;border:1px solid var(--line);width:fit-content;}
+  .bgToggleBtn{background:var(--paper);border:none;color:var(--ink-soft);padding:6px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+  .bgToggleBtn.active{background:var(--navy);color:#fff;}
+  .bgToggleBtn:not(.active):hover{color:var(--ink);}
 
   nav.tabs{display:flex;background:var(--navy-dark);padding:0 28px;}
   nav.tabs button{
@@ -270,6 +274,14 @@
                 <input type="color" id="mountColorInput" value="#F5F1E8">
               </div>
             </div>
+
+            <div class="mountControls">
+              <label style="margin-bottom:8px;">Export / share background</label>
+              <div class="bgToggle" id="bgToggle">
+                <button class="bgToggleBtn active" data-bg="transparent" type="button">Transparent</button>
+                <button class="bgToggleBtn" data-bg="white" type="button">White</button>
+              </div>
+            </div>
           </div>
         </aside>
 
@@ -287,6 +299,9 @@
             <canvas id="previewCanvas" style="display:none;"></canvas>
           </div>
           <div class="frameCaption" id="frameCaption"></div>
+          <div style="text-align:center;margin-top:12px;">
+            <button class="btn secondary" id="shareBtn" type="button" style="font-size:12px;padding:8px 18px;">Share preview</button>
+          </div>
         </div>
       </div>
     </section>
@@ -365,6 +380,23 @@
       <button class="btn" id="cameraCaptureBtn" type="button">Capture</button>
       <button class="btn secondary" id="cameraRetakeBtn" type="button" style="display:none;">Retake</button>
       <button class="btn" id="cameraUseBtn" type="button" style="display:none;">Use this photo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SHARE MODAL ================= -->
+<div class="overlay" id="shareModal">
+  <div class="panel">
+    <h3>Share preview</h3>
+    <div class="cameraStage" style="min-height:auto;background:
+      repeating-conic-gradient(var(--paper-dim) 0% 25%, var(--paper) 0% 50%) 50% / 22px 22px;">
+      <img id="sharePreviewImg" alt="" style="width:100%;max-height:50vh;object-fit:contain;">
+    </div>
+    <p class="cropHint" id="shareFallbackNote" style="display:none;">This browser doesn't support sharing directly to apps here — download the image, then attach it in WhatsApp or your email app.</p>
+    <div class="closeRow" style="justify-content:flex-start;flex-wrap:wrap;gap:10px;">
+      <button class="btn" id="shareNativeBtn" type="button" style="display:none;">Share&hellip;</button>
+      <button class="btn secondary" id="shareDownloadBtn" type="button">Download image</button>
+      <button class="btn secondary" id="shareCloseBtn" type="button" style="margin-left:auto;">Close</button>
     </div>
   </div>
 </div>
@@ -452,7 +484,8 @@ let state = {
   carouselIndex: 0,
   authMode: "signin",
   editingFrame: null,
-  unit: localStorage.getItem("fv_unit") || "in"   // all measurements are stored in mm; this only affects display/input
+  unit: localStorage.getItem("fv_unit") || "in",  // all measurements are stored in mm; this only affects display/input
+  bgMode: "transparent"   // "transparent" | "white" — affects the rendered canvas, so it's what gets shared too
 };
 
 /* ---------------- units ---------------- */
@@ -494,6 +527,14 @@ document.querySelectorAll(".unitToggleBtn").forEach(b=>{
   b.addEventListener("click", ()=> setUnit(b.dataset.unit));
 });
 document.querySelectorAll(".unitLabel").forEach(el=> el.textContent = state.unit);
+
+document.querySelectorAll(".bgToggleBtn").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    state.bgMode = b.dataset.bg;
+    document.querySelectorAll(".bgToggleBtn").forEach(x=> x.classList.toggle("active", x===b));
+    renderStage();
+  });
+});
 
 /* ---------------- helpers ---------------- */
 function $(id){ return document.getElementById(id); }
@@ -988,6 +1029,63 @@ $("cameraUseBtn").addEventListener("click", ()=>{
   }, "image/jpeg", 0.92);
 });
 
+/* ---- share preview (WhatsApp / email / anything else on the device) ----
+   Uses the Web Share API where available — that's what lets the OS-level
+   share sheet offer WhatsApp, Mail, Messages etc. directly. Where it isn't
+   available (mainly desktop browsers without file-sharing support), falls
+   back to a plain download so the image can be attached manually. */
+function canvasToBlob(canvas, type, quality){
+  return new Promise(resolve => canvas.toBlob(resolve, type, quality));
+}
+const shareState = { blob:null, filename:null };
+$("shareBtn").addEventListener("click", async ()=>{
+  if(!state.currentArtwork || state.selections.length === 0){
+    toast("Add an artwork and at least one frame to share a preview.");
+    return;
+  }
+  const canvas = $("previewCanvas");
+  const blob = await canvasToBlob(canvas, "image/png");
+  if(!blob){ toast("Couldn't generate the image."); return; }
+
+  const sel = state.selections[state.carouselIndex];
+  const rawName = `${state.currentArtwork.title} - ${sel.frames.map(f=>f.name).join(" + ")}`;
+  const filename = rawName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 80) + ".png";
+  shareState.blob = blob;
+  shareState.filename = filename || "frame-preview.png";
+
+  $("sharePreviewImg").src = URL.createObjectURL(blob);
+
+  let canShareFiles = false;
+  if(navigator.canShare){
+    try{
+      const testFile = new File([blob], shareState.filename, { type:"image/png" });
+      canShareFiles = navigator.canShare({ files:[testFile] });
+    }catch(e){ canShareFiles = false; }
+  }
+  $("shareNativeBtn").style.display = canShareFiles ? "inline-block" : "none";
+  $("shareFallbackNote").style.display = canShareFiles ? "none" : "block";
+  $("shareModal").classList.add("active");
+});
+$("shareCloseBtn").addEventListener("click", ()=> $("shareModal").classList.remove("active"));
+$("shareNativeBtn").addEventListener("click", async ()=>{
+  try{
+    const file = new File([shareState.blob], shareState.filename, { type:"image/png" });
+    await navigator.share({ files:[file], title:"Frame preview", text:"Frame preview from Hourglass Frame Visualiser" });
+    $("shareModal").classList.remove("active");
+  }catch(err){
+    if(err && err.name === "AbortError") return; // user cancelled the share sheet — not an error
+    toast("Couldn't open the share sheet — try downloading instead.");
+  }
+});
+$("shareDownloadBtn").addEventListener("click", ()=>{
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(shareState.blob);
+  a.download = shareState.filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+});
+
 /* ---------------- visualiser ---------------- */
 function renderArtworkSelect(){
   const sel = $("artworkSelect");
@@ -1314,6 +1412,12 @@ async function compositeFramePreview(canvas, artwork, selection){
   canvas.height = outerH + pad*2;
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(state.bgMode === "white"){
+    ctx.save();
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.restore();
+  }
 
   const ox = pad, oy = pad;
 
